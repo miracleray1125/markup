@@ -1,4 +1,4 @@
-import { Text } from "@mantine/core"
+import { Center, Grid, Text } from "@mantine/core"
 
 interface Props {
   workspaceId: string
@@ -7,13 +7,15 @@ interface Props {
 
 function SmartAssistant({ workspaceId, setSuggestionCount }: Props) {
   return (
-    <Text sx={{
-      fontSize: 12,
-      textTransform: "uppercase",
-      fontWeight: "bold",
-    }}>
-      Coming soon
-    </Text>
+    <Grid>
+      <Grid.Col xs={12}>
+        <Center>
+          <Text color="dimmed">
+            Predictive annotations are currently in beta. Please check back later.
+          </Text>
+        </Center>
+      </Grid.Col>
+    </Grid>
   )
 }
 

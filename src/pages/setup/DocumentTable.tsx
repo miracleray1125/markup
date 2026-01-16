@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react"
 import uuid from "react-uuid"
 import { database, WorkspaceDocument } from "storage/database/Database"
 import notify from "utils/Notifications"
+import { parseJsonAnnotations } from "./ParseJsonAnnotations"
+import { parseStandoffAnnotations } from "./ParseStandoffAnnotations"
 import { SectionProps } from "./Setup"
 
 function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: SectionProps) {
@@ -34,6 +36,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
         .then(insertedDocuments => {
           setDocumentFiles([])
           setDocuments([...documents, ...insertedDocuments])
+          notify.success(`${insertedDocuments.length} documents uploaded.`)
         })
         .catch((e) => notify.error("Failed to upload documents.", e))
     }
@@ -72,6 +75,27 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
     }
   }, [documents, workspaceStatus, setWorkspaceStatus])
 
+  useEffect(() => {
+    const documentIds = documents.map(document => document.id)
+
+    database
+      .getWorkspaceAnnotations(documentIds)
+      .then(documentAnnotations => {
+        const documentToAnnotationCount = {} as Record<string, number>
+
+        documentAnnotations.forEach(documentAnnotation => {
+          if (documentAnnotation.length > 0) {
+            const documentId = documentAnnotation[0].document_id
+
+            documentToAnnotationCount[documentId] = documentAnnotation.length
+          }
+        })
+
+        setDocumentToAnnotationCount(documentToAnnotationCount)
+      })
+      .catch((e) => notify.error("Failed to load annotations.", e))
+  }, [documents])
+
   return (
     <Card shadow="xs" radius={5}>
       <DataTable
@@ -105,9 +129,17 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
                   {document.name}
                 </Text>
 
-                <Text size="sm" color="dimmed">
-                  No annotations
-                </Text>
+                {documentToAnnotationCount[document.id] && (
+                  <Text size="sm" color="dimmed">
+                    {documentToAnnotationCount[document.id]} annotations
+                  </Text>
+                )}
+
+                {!documentToAnnotationCount[document.id] && (
+                  <Text size="sm" color="dimmed">
+                    No annotations
+                  </Text>
+                )}
               </>
             ),
           },
@@ -115,7 +147,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
             accessor: "actions",
             title: (
               <Group position="right">
-                <FileButton onChange={setAnnotationFiles} accept=".json,.ann" multiple  key={uuid()}>
+                <FileButton onChange={setAnnotationFiles} accept=".json,.ann" multiple key={uuid()}>
                   {(props) => (
                     <Button {...props} variant="light">
                       Upload annotations
@@ -123,7 +155,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
                   )}
                 </FileButton>
 
-                <FileButton onChange={setDocumentFiles} accept=".txt" multiple  key={uuid()}>
+                <FileButton onChange={setDocumentFiles} accept=".txt" multiple key={uuid()}>
                   {(props) => (
                     <Button {...props}>
                       Upload documents
@@ -136,7 +168,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
             render: (document) => (
               <Group spacing={8} position="right" noWrap>
                 <FileButton
-                  accept=".json"
+                  accept=".json,.ann"
                   onChange={(file) => {
                     if (file) {
                       uploadAnnotations(document.id, file)
@@ -166,7 +198,13 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
 
                       database
                         .deleteWorkspaceDocument(document.id)
-                        .then(() => setDocuments(documents.filter(i => i.id !== document.id)))
+                        .then(() => {
+                          setDocuments(documents.filter(i => i.id !== document.id))
+
+                          const copy = { ...documentToAnnotationCount }
+                          delete copy[document.id]
+                          setDocumentToAnnotationCount(copy)
+                        })
                         .catch((e) => notify.error("Failed to delete document.", e))
                     }}
                   >
@@ -220,5 +258,5 @@ export default DocumentTable
 
 //   database
 //     .addWorkspaceAnnotations(documentId, Object.values(rawAnnotationMap))
-//     .catch((e) => notify.error("Failed to upload annotations.", e))
+//     .catch(() => console.error("Failed to upload annotations. Please try again later."))
 // }

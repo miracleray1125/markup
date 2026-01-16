@@ -1,5 +1,4 @@
-import { Group, ActionIcon, Text } from "@mantine/core"
-import { IconCaretDown, IconCaretRight, IconInfoCircle } from "@tabler/icons"
+import { Group, Text, Stack } from "@mantine/core"
 
 interface TitleProps {
   text: string

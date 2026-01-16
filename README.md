@@ -1,6 +1,6 @@
 # Markup Annotation Tool for ML and NLP
 
-![](https://markup-storage.s3.eu-west-2.amazonaws.com/annotate.png)
+![](https://markup-storage.s3.eu-west-2.amazonaws.com/annotate-dark-v2.png)
 
 Markup is an online annotation tool that can be used to transform unstructured documents into structured formats for NLP and ML tasks, such as named-entity recognition. Markup learns as you annotate to predict and suggest complex annotations, and also provides integrated access to common and custom ontologies for concept mapping.
 
@@ -16,12 +16,13 @@ Markup is an online annotation tool that can be used to transform unstructured d
 
 # Installation
 
-To install and use Markup on your own machine:
+To install and run Markup locally:
 
-1. Clone the repository, `git clone https://github.com/samueldobbie/markup`
-1. Navigate to the directory, `cd markup`
-1. Install dependencies, `yarn install`
-1. Start the development server, `yarn start`
+1. Clone the repository and install dependencies, `git clone https://github.com/samueldobbie/markup && cd markup && yarn install`
+1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli)
+1. Start Supabase, `supabase start`. This will generate and output an API URL and anon key. Add both to the `.env.local` file
+1. Add an [OpenAI API key](https://platform.openai.com/account/api-keys) to the `.env.local` file (Optional)
+1. Run the development server, `yarn start`
 1. Open Markup in your web browser, `http://localhost:3000`
 
 # Usage

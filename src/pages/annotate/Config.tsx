@@ -1,19 +1,24 @@
-import { Button, Card, Collapse, Grid, Group, ScrollArea, Select } from "@mantine/core"
+import { ActionIcon, Button, Card, Collapse, Grid, Group, MultiSelect, Radio, ScrollArea, Select, Text, Tooltip } from "@mantine/core"
+import { IconCaretDown, IconCaretRight, IconInfoCircle } from "@tabler/icons"
 import { database } from "storage/database/Database"
 import { useState, useEffect } from "react"
-import { useSetRecoilState } from "recoil"
-import { activeOntologyConceptsState, populatedAttributeState } from "storage/state/Annotate"
+import { useRecoilState, useSetRecoilState } from "recoil"
+import { activeEntityState, configState, entityColoursState, populatedAttributeState, activeOntologyConceptsState } from "storage/state/Annotate"
 import { SectionProps } from "./Annotate"
-import { parseConfig } from "pages/annotate/ParseConfig"
+import { Attribute } from "./ParseStandoffConfig"
+import distinctColors from "distinct-colors"
 import { OntologyConcept } from "pages/dashboard/OntologyTable"
 import notify from "utils/Notifications"
 import Title from "components/title/Title"
 import EntityConfig from "components/annotate/EntityConfig"
 import AttributeConfig, { SelectData } from "components/annotate/AttributeConfig"
-import { IConfig } from "pages/setup/ConfigTable"
+import { IconNumber1, IconNumber2, IconNumber3, IconNumber4 } from "@tabler/icons"
+
+const SUGGEST_ENTITY_API_URL = "https://vior5kmthct3a7wzlpc4r6yy2i0iqfnc.lambda-url.eu-west-2.on.aws/"
+const SUGGEST_ATTRIBUTES_API_URL = "https://r6k5pux3iwubbplreajwa6ppoe0apqpf.lambda-url.eu-west-2.on.aws/"
 
 function Config({ workspace }: SectionProps) {
-  const [config, setConfig] = useState<IConfig>({ entities: [], globalAttributes: [] })
+  const [config, setConfig] = useRecoilState(configState)
   const [entitySectionOpen, setEntitySectionOpen] = useState(true)
   const [attributeSectionOpen, setAttributeSectionOpen] = useState(true)
   const [ontologySectionOpen, setOntologySectionOpen] = useState(true)
@@ -27,14 +32,9 @@ function Config({ workspace }: SectionProps) {
   useEffect(() => {
     database
       .getWorkspaceConfig(workspace.id)
-      .then(configs => {
-        if (configs.length > 0) {
-          const config = parseConfig(configs[0].content)
-
-          setConfig(config)
-        } else {
-          notify.error("Failed to load workspace config.")
-        }
+      .then(config => {
+        const parsedConfig = parseJsonConfig(config.content)
+        setConfig(parsedConfig)
       })
       .catch((e) => notify.error("Failed to load workspace config.", e))
   }, [setConfig, workspace.id])
@@ -65,115 +65,314 @@ function Config({ workspace }: SectionProps) {
     }
   }, [selectedOntologyId, setActiveOntologyConcept])
 
-  const clearPopulatedAttributes = () => {
+  useEffect(() => {
+    if (proposedAnnotation) {
+      const { start, end } = proposedAnnotation
+      const text = documents[documentIndex].content.slice(start, end)
+
+      setSelectedText(text)
+    } else {
+      setSelectedText("")
+    }
+
+    setActiveEntity("")
+    setSuggestedEntity("")
+    setSuggestedAttributes({})
+  }, [proposedAnnotation, documents, documentIndex, config, setActiveEntity])
+
+  useEffect(() => {
+    if (selectedText !== "") {
+      fetch(SUGGEST_ENTITY_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selectedText,
+          availableEntities: config.entities.map(entity => entity.name),
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data["entity"]) {
+            setSuggestedEntity(data["entity"])
+          } else {
+            setSuggestedEntity("")
+          }
+        })
+    }
+  }, [config, selectedText, setSuggestedEntity])
+
+  useEffect(() => {
+    if (activeEntity === "") {
+      setSuggestedAttributes({})
+      return
+    }
+
+    const entityAttributes = config.entities.find(entity => entity.name === activeEntity)?.attributes ?? []
+    const globalAttributes = config.globalAttributes
+    const availableAttributes = [...entityAttributes, ...globalAttributes]
+
+    fetch(SUGGEST_ATTRIBUTES_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        selectedText,
+        selectedEntity: activeEntity,
+        availableAttributes,
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        Object.keys(data).forEach((key) => {
+          if (data[key] === "") {
+            delete data[key]
+          }
+        })
+
+        setSuggestedAttributes(data)
+      })
+  }, [activeEntity, selectedText, config])
+
+  const addAnnotation = () => {
+    if (!proposedAnnotation) {
+      notify.error("You need to highlight text within the document.")
+      return
+    }
+
+    if (!activeEntity) {
+      notify.error("You need to select an entity.")
+      return
+    }
+
+    const { start, end } = proposedAnnotation
+
+    const documentId = documents[documentIndex].id
+    const text = documents[documentIndex].content.slice(start, end)
+
+    const allAttributes = {
+      ...populatedAttributes,
+    }
+
+    if (activeOntologyConcept.name && activeOntologyConcept.code) {
+      allAttributes["ontologyName"] = activeOntologyConcept.name
+      allAttributes["ontologyCode"] = activeOntologyConcept.code
+    }
+
+    const rawAnnotation = {
+      text,
+      entity: activeEntity,
+      start_index: start,
+      end_index: end,
+      attributes: allAttributes,
+    } as RawAnnotation
+
+    database
+      .addWorkspaceAnnotation(workspace.id, documentId, rawAnnotation)
+      .then((annotation) => {
+        const copy = [...annotations]
+        copy[documentIndex] = [...copy[documentIndex], annotation]
+        setAnnotations(copy)
+      })
+      .catch((e) => notify.error("Failed to add annotation.", e))
+
+    if (activeTutorialStep === 1) {
+      setActiveTutorialStep(3)
+    }
+
+    setSelectedText("")
+    setActiveEntity("")
+    setSuggestedEntity("")
+    setSuggestedAttributes({})
     setPopulatedAttributes({})
+    setProposedAnnotation(null)
   }
 
-  const clearPopulatedOntologyConcepts = () => {
-    setSelectedOntologyId(null)
-    setSelectedOntologyConcepts([])
-    setActiveOntologyConcept({ name: "", code: "" })
-  }
+  useEffect(() => {
+    setActiveEntity("")
+    setSuggestedEntity("")
+    setSuggestedAttributes({})
+    setPopulatedAttributes({})
+  }, [documentIndex, selectedText, setActiveEntity, setPopulatedAttributes])
 
   return (
     <Card shadow="xs" radius={5} p="xl">
       <ScrollArea scrollbarSize={0} sx={{ height: "76vh" }}>
         <Grid>
           <Grid.Col xs={12}>
-            <Title
-              text="Select entity"
-              description="Select the entity you want to annotate."
-              open={entitySectionOpen}
-              setOpen={setEntitySectionOpen}
-            />
-          </Grid.Col>
-
-          <Grid.Col xs={12}>
-            <Collapse in={entitySectionOpen}>
-              <EntityConfig config={config} />
-            </Collapse>
-          </Grid.Col>
-
-          <Grid.Col xs={12}>
             <Group position="apart">
               <Title
-                text="Add attributes"
-                open={attributeSectionOpen}
-                setOpen={setAttributeSectionOpen}
+                text="Select text"
+                description="Highlight the document text you want to annotate."
+                open={true}
+                setOpen={() => { }}
+                number={<IconNumber1 size={15} color="gray" />}
               />
+            </Group>
+          </Grid.Col>
+
+          <Grid.Col xs={12}>
+            <Text sx={{ padding: 5 }}>
+              <Code sx={{ fontSize: 15 }} color="rgb(111, 114, 233)">
+                {selectedText === "" ? "Highlight the text you want to annotate." : selectedText}
+              </Code>
+            </Text>
+          </Grid.Col>
+
+          <Grid.Col xs={12} pb={0}>
+            <Group position="apart">
+              <Title
+                text="Select entity"
+                description="The high-level concept you are annotating."
+                open={entitySectionOpen}
+                setOpen={setEntitySectionOpen}
+                number={<IconNumber2 size={15} color="gray" />}
+              />
+            </Group>
+          </Grid.Col>
+
+          <Grid.Col xs={12}>
+            <Group position="left" spacing={4} mb={10}>
+              <Text size="xs">
+                Suggested:
+              </Text>
 
               <Button
                 variant="subtle"
-                onClick={clearPopulatedAttributes}
+                size="xs"
+                p={0}
+                onClick={() => {
+                  if (suggestedEntity !== "") {
+                    setActiveEntity(suggestedEntity)
+                  }
+                }}
               >
-                Clear
+                {suggestedEntity === "" ? "NA" : suggestedEntity}
               </Button>
+            </Group>
+
+            <EntityConfig config={config} />
+          </Grid.Col>
+
+          <Grid.Col xs={12} pb={0}>
+            <Group position="apart">
+              <Title
+                text="Add attributes"
+                description="The specific properties of the entity."
+                open={attributeSectionOpen}
+                setOpen={setAttributeSectionOpen}
+                number={<IconNumber3 size={15} color="gray" />}
+              />
             </Group>
           </Grid.Col>
 
           <Grid.Col xs={12}>
             <Collapse in={attributeSectionOpen}>
-              <AttributeConfig config={config} />
+              {activeEntity === "" && shownAttributes.length === 0 &&
+                <Text color="dimmed">
+                  Select entity to see attributes
+                </Text>
+              }
+
+              {activeEntity !== "" && shownAttributes.length === 0 &&
+                <Text color="dimmed">
+                  Selected entity has no attributes
+                </Text>
+              }
+
+              {shownAttributes.length > 0 &&
+                <Group mb={20}>
+                  <Grid sx={{ width: "100%" }}>
+                    {shownAttributes.map((attribute, index) => (
+                      <Grid.Col xs={12} key={index}>
+                        <MultiSelect
+                          maxSelectedValues={100}
+                          data={attribute.options}
+                          placeholder={attribute.name}
+                          size="sm"
+                          key={index + attribute.name}
+                          onChange={(value) => {
+                            const copy = { ...populatedAttributes }
+
+                            if (value.length > 0) {
+                              copy[attribute.name] = value
+                            } else if (Object.keys(copy).includes(attribute.name)) {
+                              delete copy[attribute.name]
+                            }
+
+                            setPopulatedAttributes(copy)
+                          }}
+                          searchable
+                          clearable
+                          creatable={attribute.allowCustomValues}
+                          getCreateLabel={(query) => `+ Create ${query}`}
+                        />
+                      </Grid.Col>
+                    ))}
+                  </Grid>
+                </Group>
+              }
             </Collapse>
           </Grid.Col>
 
           <Grid.Col xs={12}>
             <Group position="apart">
               <Title
-                text="Map to ontology"
+                text="Ontology"
+                description="The concept you want to map to the entity."
                 open={ontologySectionOpen}
                 setOpen={setOntologySectionOpen}
+                number={<IconNumber4 size={15} color="gray" />}
               />
-
-              <Button
-                variant="subtle"
-                onClick={clearPopulatedOntologyConcepts}
-              >
-                Clear
-              </Button>
             </Group>
           </Grid.Col>
 
           <Grid.Col xs={12}>
-            <Collapse in={ontologySectionOpen}>
-              <Group mb={20}>
-                <Grid sx={{ width: "100%" }}>
-                  <Grid.Col xs={12}>
-                    <Select
-                      data={availableOntologies}
-                      placeholder="Ontology"
-                      size="sm"
-                      searchable
-                      onChange={setSelectedOntologyId}
-                    />
-                  </Grid.Col>
+            <Group mb={20}>
+              <Grid sx={{ width: "100%" }}>
+                <Grid.Col xs={12}>
+                  <Select
+                    data={availableOntologies}
+                    placeholder="Ontology"
+                    size="sm"
+                    searchable
+                    onChange={setSelectedOntologyId}
+                  />
+                </Grid.Col>
 
-                  <Grid.Col xs={12}>
-                    <Select
-                      data={selectedOntologyConcepts.map(concept => {
-                        return {
-                          label: `${concept.name} (${concept.code})`,
-                          value: concept.code,
-                        }
-                      })}
-                      placeholder="Concept"
-                      size="sm"
-                      searchable
-                      clearable
-                      creatable
-                      onChange={(code) => {
-                        const name = selectedOntologyConcepts.find(concept => concept.code === code)?.name
+                <Grid.Col xs={12}>
+                  <Select
+                    data={selectedOntologyConcepts.map(concept => {
+                      return {
+                        label: `${concept.name} (${concept.code})`,
+                        value: concept.code,
+                      }
+                    })}
+                    placeholder="Concept"
+                    size="sm"
+                    searchable
+                    clearable
+                    creatable
+                    onChange={(code) => {
+                      const name = selectedOntologyConcepts.find(concept => concept.code === code)?.name
 
-                        setActiveOntologyConcept({
-                          code: code ?? "",
-                          name: name ?? "",
-                        })
-                      }}
-                    />
-                  </Grid.Col>
-                </Grid>
-              </Group>
-            </Collapse>
+                      setActiveOntologyConcept({
+                        code: code ?? "",
+                        name: name ?? "",
+                      })
+                    }}
+                  />
+                </Grid.Col>
+              </Grid>
+            </Group>
+          </Grid.Col>
+
+          <Grid.Col xs={12}>
+            <Button fullWidth onClick={() => addAnnotation()}>
+              Add annotation
+            </Button>
           </Grid.Col>
         </Grid>
       </ScrollArea>
