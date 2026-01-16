@@ -1,8 +1,8 @@
 import { definitions } from "./Definitions"
 import { supabase } from "../../utils/Supabase"
 import { OntologyConcept } from "pages/dashboard/OntologyTable"
-import { WorkspaceCollaborator } from "pages/dashboard/WorkspaceTable"
 import { WorkspaceGuideline } from "pages/setup/GuidelinesTable"
+import uuid from "react-uuid"
 
 export type Workspace = definitions["workspace"]
 export type WorkspaceAccess = definitions["workspace_access"]
@@ -10,41 +10,54 @@ export type WorkspaceDocument = definitions["workspace_document"]
 export type RawWorkspaceDocument = Omit<Omit<definitions["workspace_document"], "id">, "created_at">
 export type WorkspaceConfig = definitions["workspace_config"]
 export type WorkspaceAnnotation = definitions["workspace_annotation"]
-export type RawAnnotation = Omit<Omit<Omit<definitions["workspace_annotation"], "id">, "created_at">, "document_id">
+export type RawAnnotation = Omit<Omit<Omit<Omit<definitions["workspace_annotation"], "id">, "created_at">, "document_id">, "workspace_id">
 export type Ontology = definitions["ontology"]
 export type OntologyAccess = definitions["ontology_access"]
 
-async function addWorkspace(name: string, description: string): Promise<Workspace[]> {
+async function addWorkspace(name: string, description: string): Promise<string> {
   const user = await supabase.auth.getUser()
   const userId = user.data.user?.id ?? ""
+  const workspaceId = uuid()
 
-  const { data: workspace, error: workspaceError } = await supabase
+  const { error: workspaceError } = await supabase
     .from("workspace")
     .insert({
+      id: workspaceId,
       name,
       description,
     })
-    .select()
 
   if (workspaceError) {
-    console.error(workspaceError)
-    return []
+    throw new Error(workspaceError.message)
   }
 
   const { error: workspaceAccessError } = await supabase
     .from("workspace_access")
     .insert({
       user_id: userId,
-      workspace_id: workspace[0].id,
+      workspace_id: workspaceId,
       is_owner: true,
     })
 
   if (workspaceAccessError) {
-    console.error(workspaceAccessError)
-    return []
+    throw new Error(workspaceAccessError.message)
   }
 
-  return workspace
+  return workspaceId
+}
+
+async function updateWorkspace(workspaceId: string, name: string, description: string): Promise<void> {
+  const { error: workspaceError } = await supabase
+    .from("workspace")
+    .update({
+      name,
+      description,
+    })
+    .eq("id", workspaceId)
+
+  if (workspaceError) {
+    throw new Error(workspaceError.message)
+  }
 }
 
 async function getWorkspaces(): Promise<Record<string, Workspace[]>> {
@@ -56,14 +69,16 @@ async function getWorkspaces(): Promise<Record<string, Workspace[]>> {
     collaborator: [] as Workspace[],
   }
 
+  // TODO - drop request to workspace_access
+
   const { data: workspaceAccessData, error: workspaceAccessError } = await supabase
     .from("workspace_access")
     .select()
     .eq("user_id", userId)
+    .eq("is_demo", false)
 
   if (workspaceAccessError) {
-    console.error(workspaceAccessError)
-    return result
+    throw new Error(workspaceAccessError.message)
   }
 
   workspaceAccessData?.forEach((access) => {
@@ -76,8 +91,7 @@ async function getWorkspaces(): Promise<Record<string, Workspace[]>> {
     .in("id", workspaceIds)
 
   if (workspaceError) {
-    console.error(workspaceError)
-    return result
+    throw new Error(workspaceError.message)
   }
 
   workspaceData?.forEach((workspace) => {
@@ -94,14 +108,16 @@ async function getWorkspaces(): Promise<Record<string, Workspace[]>> {
 }
 
 async function getWorkspace(workspaceId: string): Promise<Workspace[]> {
-  const { data: workspaceData, error: workspaceError } = await supabase
+  const { data, error } = await supabase
     .from("workspace")
     .select()
     .eq("id", workspaceId)
 
-  workspaceError && console.error(workspaceError)
+  if (error) {
+    throw new Error(error.message)
+  }
 
-  return workspaceData ?? []
+  return data
 }
 
 async function deleteWorkspace(workspaceId: string): Promise<boolean> {
@@ -111,8 +127,7 @@ async function deleteWorkspace(workspaceId: string): Promise<boolean> {
     .eq("id", workspaceId)
 
   if (error) {
-    console.error(error)
-    return true
+    throw new Error(error.message)
   }
 
   return false
@@ -135,8 +150,7 @@ async function addWorkspaceDocuments(workspaceId: string, files: File[]): Promis
     .select()
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
   return documents
@@ -149,8 +163,7 @@ async function getWorkspaceDocuments(workspaceId: string): Promise<WorkspaceDocu
     .eq("workspace_id", workspaceId)
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
   return documents
@@ -163,8 +176,7 @@ async function deleteWorkspaceDocument(documentId: string): Promise<boolean> {
     .eq("id", documentId)
 
   if (error) {
-    console.error(error)
-    return true
+    throw new Error(error.message)
   }
 
   return false
@@ -177,8 +189,7 @@ async function getWorkspaceGuideline(workspaceId: string): Promise<WorkspaceGuid
     .eq("workspace_id", workspaceId)
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
   return config
@@ -195,8 +206,7 @@ async function addWorkspaceGuideline(workspaceId: string, file: File): Promise<W
     .select()
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
   return config
@@ -209,50 +219,49 @@ async function deleteWorkspaceGuideline(guidelineId: string): Promise<boolean> {
     .eq("id", guidelineId)
 
   if (error) {
-    console.error(error)
-    return true
+    throw new Error(error.message)
   }
 
   return false
 }
 
-async function addWorkspaceConfig(workspaceId: string, name: string, content: string): Promise<WorkspaceConfig> {
+async function addWorkspaceConfig(id: string, workspaceId: string, name: string, content: string): Promise<WorkspaceConfig> {
   const { data: config, error } = await supabase
     .from("workspace_config")
-    .insert({
+    .upsert({
+      id,
       workspace_id: workspaceId,
       name,
       content,
     })
     .select()
 
-  if (error || config === null || config.length === 0) {
-    console.error(error)
+  if (error) {
+    throw new Error(error.message)
+  }
 
-    return {
-      id: "",
-      created_at: "",
-      workspace_id: "",
-      name: "",
-      content: "",
-    }
+  if (config === null || config.length === 0) {
+    throw new Error("Invalid workspace config")
   }
 
   return config[0]
 }
 
-async function getWorkspaceConfig(workspaceId: string): Promise<WorkspaceConfig[]> {
+async function getWorkspaceConfig(workspaceId: string): Promise<WorkspaceConfig> {
   const { data: config, error } = await supabase
     .from("workspace_config")
     .select()
     .eq("workspace_id", workspaceId)
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
-  return config
+  if (config === null || config.length === 0) {
+    throw new Error("Invalid workspace config")
+  }
+
+  return config[0]
 }
 
 async function deleteWorkspaceConfig(configId: string): Promise<boolean> {
@@ -262,20 +271,21 @@ async function deleteWorkspaceConfig(configId: string): Promise<boolean> {
     .eq("id", configId)
 
   if (error) {
-    console.error(error)
-    return true
+    throw new Error(error.message)
   }
 
   return false
 }
 
 async function addWorkspaceAnnotation(
+  workspaceId: string,
   documentId: string,
   rawAnnotation: RawAnnotation,
 ): Promise<WorkspaceAnnotation> {
   const { data: annotation, error } = await supabase
     .from("workspace_annotation")
     .insert({
+      workspace_id: workspaceId,
       document_id: documentId,
       entity: rawAnnotation.entity,
       start_index: rawAnnotation.start_index,
@@ -285,24 +295,19 @@ async function addWorkspaceAnnotation(
     })
     .select()
 
-  if (error || annotation === null || annotation.length === 0) {
-    console.error(error)
+  if (error) {
+    throw new Error(error.message)
+  }
 
-    return {
-      id: "",
-      created_at: "",
-      document_id: "",
-      text: "",
-      start_index: -1,
-      end_index: -1,
-      attributes: {},
-    } as WorkspaceAnnotation
+  if (annotation === null || annotation.length === 0) {
+    throw new Error("Invalid workspace annotation")
   }
 
   return annotation[0]
 }
 
 async function addWorkspaceAnnotations(
+  workspaceId: string,
   documentId: string,
   rawAnnotations: RawAnnotation[],
 ): Promise<void> {
@@ -310,6 +315,7 @@ async function addWorkspaceAnnotations(
     .from("workspace_annotation")
     .insert(
       rawAnnotations.map((rawAnnotation) => ({
+        workspace_id: workspaceId,
         document_id: documentId,
         entity: rawAnnotation.entity,
         start_index: rawAnnotation.start_index,
@@ -320,8 +326,12 @@ async function addWorkspaceAnnotations(
     )
     .select()
 
-  if (error || annotations === null || annotations.length === 0) {
-    console.error(error)
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (annotations === null || annotations.length === 0) {
+    throw new Error("Invalid workspace annotations")
   }
 }
 
@@ -331,9 +341,8 @@ async function getWorkspaceAnnotations(documentIds: string[]): Promise<Workspace
     .select()
     .in("document_id", documentIds)
 
-  if (error || annotations === null) {
-    console.error(error)
-    return []
+  if (error) {
+    throw new Error(error.message)
   }
 
   const result: WorkspaceAnnotation[][] = []
@@ -352,124 +361,128 @@ async function deleteWorkspaceAnnotation(annotationId: string): Promise<boolean>
     .eq("id", annotationId)
 
   if (error) {
-    console.error(error)
-    return true
+    throw new Error(error.message)
   }
 
   return false
 }
 
-async function addWorkspaceCollaborator(workspaceId: string, email: string): Promise<WorkspaceCollaborator> {
-  const { data: user, error: errorUser } = await supabase
-    .from("users")
-    .select()
-    .eq("email", email)
-
-  if (errorUser || user === null || user.length === 0) {
-    console.error(errorUser)
-    throw new Error("User not found")
-  }
-
-  const { data: access, error: errorAccess } = await supabase
-    .from("workspace_access")
-    .insert({
-      workspace_id: workspaceId,
-      user_id: user[0].id,
+async function addWorkspaceCollaborator(workspaceId: string, email: string): Promise<void> {
+  const { error } = await supabase
+    .functions
+    .invoke("add-collaborator", {
+      body: {
+        workspaceId,
+        email,
+      },
     })
-    .select()
 
-  if (errorAccess || access === null || access.length === 0) {
-    console.error(errorAccess)
-    throw new Error("Error adding collaborator")
+  if (error) {
+    throw new Error(error.message)
   }
 
-  const { data: workspace, error: errorWorkspace } = await supabase
+  const { data: workspace, error: workspaceError } = await supabase
     .from("workspace")
     .select()
     .eq("id", workspaceId)
 
-  if (errorWorkspace || workspace === null || workspace.length === 0) {
-    console.error(errorWorkspace)
-    throw new Error("Workspace not found")
+  if (workspaceError) {
+    throw new Error(workspaceError.message)
   }
 
-  const { error: errorUpdate } = await supabase
+  if (workspace === null || workspace.length === 0) {
+    throw new Error("Invalid workspace")
+  }
+
+  const { error: updateError } = await supabase
     .from("workspace")
     .update({
       collaborators: workspace[0].collaborators + 1,
     })
     .eq("id", workspaceId)
 
-  if (errorUpdate) {
-    console.error(errorUpdate)
-    throw new Error("Error updating workspace")
-  }
-
-  return {
-    access_id: access[0].id,
-    user_id: user[0].id,
-    email: user[0].email,
+  if (updateError) {
+    throw new Error(updateError.message)
   }
 }
 
-async function getWorkspaceCollaborators(workspaceId: string): Promise<WorkspaceCollaborator[]> {
-  const { data: accessData, error } = await supabase
-    .from("workspace_access")
-    .select()
-    .eq("workspace_id", workspaceId)
-
-  if (error) {
-    console.error(error)
-    return []
-  }
-
-  const collaborators: WorkspaceCollaborator[] = []
-  const userIds = accessData.map(i => i.user_id)
-
-  const { data: userData, error: errorUsers } = await supabase
-    .from("users")
-    .select()
-    .in("id", userIds)
-
-  if (errorUsers) {
-    console.error(errorUsers)
-    return []
-  }
-
-  accessData.forEach(i => {
-    const user = userData.find(j => j.id === i.user_id)
-
-    if (user) {
-      collaborators.push({
-        access_id: i.id,
-        user_id: user.id,
-        email: user.email,
-      })
-    }
-  })
-
-  return collaborators
-}
-
-async function addOntology(name: string, description: string, rows: OntologyConcept[]): Promise<void> {
-  const { data, error } = await supabase
-    .from("ontology")
-    .insert({
-      name,
-      description,
-    })
-    .select()
-
-  if (error) {
-    console.error(error)
-    return
-  }
-
-  const ontologyId = data[0].id
+async function getWorkspaceCollaboratorEmails(workspaceId: string): Promise<string[]> {
   const user = await supabase.auth.getUser()
   const userId = user.data.user?.id ?? ""
 
-  const { error: errorAccess } = await supabase
+  const { data: collaborators, error } = await supabase
+    .functions
+    .invoke("get-collaborator-emails", {
+      body: {
+        workspaceId,
+        requestingUserId: userId,
+      },
+    })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return JSON.parse(collaborators)
+}
+
+async function removeWorkspaceCollaborator(workspaceId: string, email: string): Promise<void> {
+  const { error } = await supabase
+    .functions
+    .invoke("remove-collaborator", {
+      body: {
+        workspaceId,
+        email,
+      },
+    })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const { data: workspace, error: workspaceError } = await supabase
+    .from("workspace")
+    .select()
+    .eq("id", workspaceId)
+
+  if (workspaceError) {
+    throw new Error(workspaceError.message)
+  }
+
+  if (workspace === null || workspace.length === 0) {
+    throw new Error("Invalid workspace")
+  }
+
+  const { error: updateError } = await supabase
+    .from("workspace")
+    .update({
+      collaborators: workspace[0].collaborators - 1,
+    })
+    .eq("id", workspaceId)
+
+  if (updateError) {
+    throw new Error(updateError.message)
+  }
+}
+
+async function addOntology(name: string, description: string, rows: OntologyConcept[]): Promise<void> {
+  const user = await supabase.auth.getUser()
+  const userId = user.data.user?.id ?? ""
+  const ontologyId = uuid()
+
+  const { error: ontologyError } = await supabase
+    .from("ontology")
+    .insert({
+      id: ontologyId,
+      name,
+      description,
+    })
+
+  if (ontologyError) {
+    throw new Error(ontologyError.message)
+  }
+
+  const { error: ontologyAccessError } = await supabase
     .from("ontology_access")
     .insert({
       user_id: userId,
@@ -477,24 +490,22 @@ async function addOntology(name: string, description: string, rows: OntologyConc
       is_owner: true,
     })
 
-  if (errorAccess) {
-    console.error(errorAccess)
-    return
+  if (ontologyAccessError) {
+    throw new Error(ontologyAccessError.message)
   }
 
-  const concepts = rows.map(i => ({
+  const ontologyConcepts = rows.map(i => ({
     ontology_id: ontologyId,
     name: i.name,
     code: i.code,
   }))
 
-  const { error: errorRows } = await supabase
+  const { error: ontologyConceptError } = await supabase
     .from("ontology_concept")
-    .insert(concepts)
+    .insert(ontologyConcepts)
 
-  if (errorRows) {
-    console.error(errorRows)
-    return
+  if (ontologyConceptError) {
+    throw new Error(ontologyConceptError.message)
   }
 }
 
@@ -517,36 +528,38 @@ async function getDefaultOntologies(): Promise<Ontology[]> {
     .eq("is_default", true)
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
   return data
 }
 
-async function getOntologies(): Promise<Ontology[]> {
-  const user = await supabase.auth.getUser()
-  const userId = user.data.user?.id ?? ""
+async function getUserOntologies(): Promise<Ontology[]> {
+  return []
+}
 
-  const { data, error } = await supabase
-    .from("ontology_access")
-    .select(`
-      ontology (
-        id,
-        created_at,
-        name,
-        description,
-        is_default
-      )
-    `)
-    .eq("user_id", userId)
+async function getWorkspaceOntologies(workspaceId: string): Promise<Ontology[]> {
+  const { data: workspaceOntologyData, error: workspaceOntologyError } = await supabase
+    .from("workspace_ontology")
+    .select()
+    .eq("workspace_id", workspaceId)
 
-  if (error) {
-    console.error(error)
-    return []
+  if (workspaceOntologyError) {
+    throw new Error(workspaceOntologyError.message)
   }
 
-  return data.map(i => i.ontology) as Ontology[]
+  const workspaceOntologyIds = workspaceOntologyData.map(i => i.ontology_id)
+
+  const { data, error } = await supabase
+    .from("ontology")
+    .select()
+    .in("id", workspaceOntologyIds)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data
 }
 
 async function getOntologyConcepts(ontologyId: string): Promise<OntologyConcept[]> {
@@ -556,8 +569,7 @@ async function getOntologyConcepts(ontologyId: string): Promise<OntologyConcept[
     .eq("ontology_id", ontologyId)
 
   if (error) {
-    console.error(error)
-    return []
+    throw new Error(error.message)
   }
 
   return data
@@ -574,7 +586,7 @@ async function removeDefaultOntology(ontologyId: string): Promise<void> {
     .eq("ontology_id", ontologyId)
 
   if (error) {
-    console.error(error)
+    throw new Error(error.message)
   }
 }
 
@@ -589,8 +601,7 @@ async function deleteOntology(ontologyId: string, isDefault: boolean): Promise<b
       .eq("ontology_id", ontologyId)
 
     if (ontologyConceptError) {
-      console.error(ontologyConceptError)
-      return true
+      throw new Error(ontologyConceptError.message)
     }
 
     const { error: ontologyAccessError } = await supabase
@@ -600,8 +611,7 @@ async function deleteOntology(ontologyId: string, isDefault: boolean): Promise<b
       .eq("user_id", userId)
 
     if (ontologyAccessError) {
-      console.error(ontologyAccessError)
-      return true
+      throw new Error(ontologyAccessError.message)
     }
 
     const { error: ontologyError } = await supabase
@@ -610,8 +620,7 @@ async function deleteOntology(ontologyId: string, isDefault: boolean): Promise<b
       .eq("id", ontologyId)
 
     if (ontologyError) {
-      console.error(ontologyError)
-      return true
+      throw new Error(ontologyError.message)
     }
   } else {
 
@@ -622,8 +631,7 @@ async function deleteOntology(ontologyId: string, isDefault: boolean): Promise<b
       .eq("user_id", userId)
 
     if (ontologyAccessError) {
-      console.error(ontologyAccessError)
-      return true
+      throw new Error(ontologyAccessError.message)
     }
   }
 
@@ -632,6 +640,7 @@ async function deleteOntology(ontologyId: string, isDefault: boolean): Promise<b
 
 export const database = {
   addWorkspace,
+  updateWorkspace,
   getWorkspaces,
   getWorkspace,
   deleteWorkspace,
@@ -654,10 +663,12 @@ export const database = {
   deleteWorkspaceAnnotation,
 
   addWorkspaceCollaborator,
-  getWorkspaceCollaborators,
+  getWorkspaceCollaboratorEmails,
+  removeWorkspaceCollaborator,
 
   addOntology,
-  getOntologies,
+  getUserOntologies,
+  getWorkspaceOntologies,
   getOntologyConcepts,
   useDefaultOntology,
   getDefaultOntologies,

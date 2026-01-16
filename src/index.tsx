@@ -1,10 +1,10 @@
-import React from "react"
 import { RecoilRoot, useRecoilState } from "recoil"
 import { AuthProvider } from "providers/AuthProvider"
 import { ColorScheme, ColorSchemeProvider, MantineProvider } from "@mantine/core"
 import { BrowserRouter } from "react-router-dom"
 import PageRoutes from "components/routes/PageRoutes"
 import { ModalsProvider } from "@mantine/modals"
+import { NotificationsProvider } from "@mantine/notifications"
 import { themeState } from "storage/state"
 import Navbar from "components/nav/NavBar"
 import ReactDOM from "react-dom/client"
@@ -51,20 +51,19 @@ function App(): JSX.Element {
               "#080809",
             ],
           },
-          primaryShade: {
-            light: 4,
-            dark: 4,
-          },
+          primaryShade: 4,
         }}
       >
-        <ModalsProvider>
-          <AuthProvider>
-            <BrowserRouter>
-              <Navbar />
-              <PageRoutes />
-            </BrowserRouter>
-          </AuthProvider>
-        </ModalsProvider>
+        <NotificationsProvider>
+          <ModalsProvider>
+            <AuthProvider>
+              <BrowserRouter>
+                <Navbar />
+                <PageRoutes />
+              </BrowserRouter>
+            </AuthProvider>
+          </ModalsProvider>
+        </NotificationsProvider>
       </MantineProvider>
     </ColorSchemeProvider >
   )
@@ -74,9 +73,7 @@ const container = document.getElementById("root") as HTMLElement
 const root = ReactDOM.createRoot(container)
 
 root.render(
-  <React.StrictMode>
-    <RecoilRoot>
-      <App />
-    </RecoilRoot>
-  </React.StrictMode>
+  <RecoilRoot>
+    <App />
+  </RecoilRoot>
 )
