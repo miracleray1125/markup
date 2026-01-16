@@ -338,10 +338,10 @@ function ManageCollaboratorsModal({ workspace, openedModal, setOpenedModal }: Ma
                 placeholder="Enter their email"
                 description={
                   <>
-                    Collaborators will have full access to the
+                    Collaborators will have full edit access to the
                     workspace <b>{workspace.name}</b>. You can revoke
                     their access at any time. The provided email
-                    must be associated with an existing Markup user account.
+                    must be associated with a registered Markup user account.
                   </>
                 }
                 {...form.getInputProps("email")}

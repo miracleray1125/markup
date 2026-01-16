@@ -8,9 +8,24 @@ enum Config {
   AttributeValueSeparator = "|",
 }
 
-function parseStandoffConfig(content: string): IConfig {
-  const entities = [] as IConfigEntity[]
-  const globalAttributes = [] as IConfigAttribute[]
+export interface Attribute {
+  name: string
+  options: string[]
+  isGlobal: boolean
+  targetEntity?: string
+  allowCustomValues?: boolean
+}
+
+function parseConfig(config: WorkspaceConfig) {
+  return {
+    entities: parseEntities(config.content),
+    attributes: parseAttributes(config.content),
+  }
+}
+
+function parseEntities(content: string) {
+  return parseSection(content, "entities")
+}
 
   const rawEntities = parseSection(content, "entities")
   const rawAttributes = parseSection(content, "attributes")

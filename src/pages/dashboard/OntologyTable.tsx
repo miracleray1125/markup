@@ -196,7 +196,17 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
 
       <Table>
         <tbody>
-          {defaultOntologies
+          {defaultOntologies.length === 0 && (
+            <tr>
+              <td colSpan={3}>
+                <Text size="sm" color="dimmed">
+                  No common ontologies added yet (coming soon).
+                </Text>
+              </td>
+            </tr>
+          )}
+
+          {defaultOntologies.length > 0 && defaultOntologies
             .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
             .map((defaultOntology) => {
               const isActive = ontologies.some(i => i.id === defaultOntology.id)
@@ -340,7 +350,7 @@ function UploadOntologyModal({ openedModal, setOpenedModal, refreshTable }: Moda
             </Text>
 
             <Text size={13} color="dimmed" mb={2}>
-              Mappings must be a JSON file in the format defined <Link to={Path.Docs} target="_blank">here</Link>.
+              Mappings must be a JSON file in the format defined <Link to={Path.Docs + "#add-an-ontology"} target="_blank">here</Link>.
             </Text>
 
             <Dropzone
