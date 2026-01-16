@@ -16,6 +16,10 @@ export interface SectionProps {
   workspace: Workspace
 }
 
+export interface SectionProps {
+  workspace: Workspace
+}
+
 function Annotate() {
   const { id } = useParams()
 

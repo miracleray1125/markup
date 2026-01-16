@@ -5,10 +5,9 @@ import { useRecoilState, useRecoilValue } from "recoil"
 import { database, WorkspaceAnnotation } from "storage/database"
 import { annotationsState, documentIndexState, documentsState, entityColoursState } from "storage/state/Annotate"
 import { SectionProps } from "./Annotate"
+import SmartAssistant from "./SmartAssistant"
 import { DEMO_DOMAINS } from "utils/Demo"
 import { exportJsonAnnotations } from "./ExportJsonAnnotations"
-import notify from "utils/Notifications"
-import SmartAssistant from "./SmartAssistant"
 
 type Entity = string
 type AnnotationGroup = Record<Entity, WorkspaceAnnotation[]>

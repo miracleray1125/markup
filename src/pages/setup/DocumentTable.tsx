@@ -59,20 +59,14 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
     func()
   }, [documents, documentFiles, workspace.id])
 
-  useEffect(() => {
-    annotationFiles.forEach(annotationFile => {
-      const document = documents.find(document => {
-        const documentFileName = document.name.split(".").slice(0, -1).join(".")
-        const annotationFileName = annotationFile.name.split(".").slice(0, -1).join(".")
+  const uploadAnnotations = async (documentId: string, file: File) => {
+    const content = await file.text()
+    const annotations = JSON.parse(content) as RawAnnotation[]
 
-        return documentFileName === annotationFileName
-      })
-
-      if (document) {
-        uploadAnnotations(document.id, annotationFile)
-      }
-    })
-  }, [annotationFiles, documents, uploadAnnotations, workspace.id])
+    database
+      .addWorkspaceAnnotations(documentId, annotations)
+      .catch(() => console.error("Failed to upload annotations. Please try again later."))
+  }
 
   useEffect(() => {
     if (setWorkspaceStatus === undefined) return
@@ -239,3 +233,39 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
 }
 
 export default DocumentTable
+
+// const uploadAnnotations = async (documentId: string, file: File) => {
+//   const rawAnnotationMap: Record<string, RawAnnotation> = {}
+//   const content = await file.text()
+//   const lines = content.split("\n")
+
+//   for (const line of lines) {
+//     if (line.startsWith("T")) {
+//       const [id, annotation, text] = line.split("\t")
+//       const [entity, start, end] = annotation.split(" ")
+
+//       rawAnnotationMap[id] = {
+//         entity,
+//         start_index: parseInt(start),
+//         end_index: parseInt(end),
+//         attributes: {},
+//         text,
+//       }
+//     } else if (line.startsWith("A")) {
+//       const [_, attribute] = line.split("\t")
+//       const [name, targetId, value] = attribute.split(" ")
+
+//       if (rawAnnotationMap[targetId]) {
+//         if (!rawAnnotationMap[targetId].attributes[name]) {
+//           rawAnnotationMap[targetId].attributes[name] = []
+//         }
+
+//         rawAnnotationMap[targetId].attributes[name].push(value)
+//       }
+//     }
+//   }
+
+//   database
+//     .addWorkspaceAnnotations(documentId, Object.values(rawAnnotationMap))
+//     .catch(() => console.error("Failed to upload annotations. Please try again later."))
+// }
