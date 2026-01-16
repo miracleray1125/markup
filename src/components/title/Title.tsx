@@ -5,27 +5,31 @@ interface TitleProps {
   description?: string
   open: boolean
   setOpen: (v: boolean) => void
-  number: JSX.Element
 }
 
-function Title({ text, description, open, setOpen, number }: TitleProps) {
+function Title({ text, description, open, setOpen }: TitleProps) {
   return (
-    <Group
-      position="apart"
-      onClick={() => setOpen(!open)}
-      sx={{ cursor: "pointer" }}
-      noWrap
-    >
-      <Stack spacing={0}>
+    <>
+      <Group
+        position="left"
+        onClick={() => setOpen(!open)}
+        sx={{ cursor: "pointer" }}
+        noWrap
+      >
+        <ActionIcon mr={-10}>
+          {open && <IconCaretDown style={{ opacity: 0.8 }} size={18} />}
+          {!open && <IconCaretRight style={{ opacity: 0.8 }} size={18} />}
+        </ActionIcon>
+
         <Text size="md">
-          {number} {text}
+          {text}
         </Text>
 
-        <Text size="xs" color="dimmed">
-          {description}
-        </Text>
-      </Stack>
-    </Group>
+        <ActionIcon ml={-15}>
+          <IconInfoCircle style={{ opacity: 0.6 }} size={18} />
+        </ActionIcon>
+      </Group>
+    </>
   )
 }
 

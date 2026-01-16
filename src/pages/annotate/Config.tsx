@@ -25,22 +25,9 @@ function Config({ workspace }: SectionProps) {
   const [availableOntologies, setAvailableOntologies] = useState<SelectData[]>([])
   const [selectedOntologyId, setSelectedOntologyId] = useState<string | null>(null)
   const [selectedOntologyConcepts, setSelectedOntologyConcepts] = useState<OntologyConcept[]>([])
-  const [activeEntity, setActiveEntity] = useRecoilState(activeEntityState)
 
   const setPopulatedAttributes = useSetRecoilState(populatedAttributeState)
   const setActiveOntologyConcept = useSetRecoilState(activeOntologyConceptsState)
-
-  const [proposedAnnotation, setProposedAnnotation] = useRecoilState(proposedAnnotationState)
-  const populatedAttributes = useRecoilValue(populatedAttributeState)
-  const activeOntologyConcept = useRecoilValue(activeOntologyConceptsState)
-  const documents = useRecoilValue(documentsState)
-  const documentIndex = useRecoilValue(documentIndexState)
-
-  const [annotations, setAnnotations] = useRecoilState(annotationsState)
-  const [activeTutorialStep, setActiveTutorialStep] = useRecoilState(activeTutorialStepState)
-  const [selectedText, setSelectedText] = useState("")
-  const [suggestedEntity, setSuggestedEntity] = useState("")
-  const [suggestedAttributes, setSuggestedAttributes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     database
