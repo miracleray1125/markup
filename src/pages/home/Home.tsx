@@ -1,4 +1,4 @@
-import { createStyles, Title, Text, Button, Container, Image, useMantineTheme, Modal, Card, Divider, Grid, ScrollArea, TextInput } from "@mantine/core"
+import { createStyles, Title, Text, Button, Container, Image, useMantineTheme, Modal, Card, Grid } from "@mantine/core"
 import { useAuth } from "providers"
 import { useState } from "react"
 import { DEMO_DOMAINS } from "utils/Demo"
@@ -47,8 +47,7 @@ const useStyles = createStyles((theme) => ({
     fontFamily: `Greycliff CF, ${theme.fontFamily}`,
 
     "@media (max-width: 520px)": {
-      fontSize: 28,
-      textAlign: "left",
+      fontSize: 40,
     },
   },
 
@@ -60,7 +59,6 @@ const useStyles = createStyles((theme) => ({
     textAlign: "center",
 
     "@media (max-width: 520px)": {
-      textAlign: "left",
       fontSize: theme.fontSizes.md,
     },
   },
@@ -85,9 +83,17 @@ const useStyles = createStyles((theme) => ({
       fontSize: theme.fontSizes.md,
 
       "&:not(:first-of-type)": {
-        marginTop: theme.spacing.md,
+        marginTop: 25,
         marginLeft: 0,
       },
+    },
+  },
+
+  demoImage: {
+    marginTop: 150,
+
+    "@media (max-width: 500px)": {
+      display: "none",
     },
   },
 }))
@@ -100,8 +106,8 @@ function Home(): JSX.Element {
   const primaryButtonText = user === null ? "Get started" : "Go to dashboard"
   const theme = useMantineTheme()
   const demoImage = theme.colorScheme === "dark"
-    ? "https://markup-storage.s3.eu-west-2.amazonaws.com/annotate.png"
-    : "https://markup-storage.s3.eu-west-2.amazonaws.com/annotate-light.png"
+    ? "https://markup-storage.s3.eu-west-2.amazonaws.com/annotate-dark-v2.png"
+    : "https://markup-storage.s3.eu-west-2.amazonaws.com/annotate-light-v2.png"
 
   const [openedDemoDomainModal, setOpenedDemoDomainModal] = useState(false)
 
@@ -122,8 +128,7 @@ function Home(): JSX.Element {
 
           <Container p={20} size={600}>
             <Text size="lg" color="dimmed" className={classes.description}>
-              Markup is an annotation tool that enables you to rapidly build
-              datasets from free-text for NLP and ML. Powered by GPT-3.
+              Markup is an annotation tool for rapidly building structured<br />datasets from free-text for NLP and ML. Powered by GPT-4.
             </Text>
           </Container>
 
@@ -150,7 +155,7 @@ function Home(): JSX.Element {
           </div>
         </div>
 
-        <div style={{ marginTop: 150 }}>
+        <div className={classes.demoImage}>
           <Image src={demoImage} radius={10} />
         </div>
 
@@ -182,11 +187,12 @@ function DemoDomainModal({ openedModal, setOpenedModal }: Props) {
       centered
     >
       <Grid>
-        {DEMO_DOMAINS.map((domain) => (
+        {DEMO_DOMAINS.map((domain, index) => (
           <Grid.Col
             span={6}
             onClick={() => window.location.href = toAnnotateUrl(domain.id)}
             sx={{ cursor: "pointer" }}
+            key={index}
           >
             <Card shadow="sm">
               <Text size="xl" weight={500}>

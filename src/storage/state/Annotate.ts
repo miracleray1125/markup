@@ -1,11 +1,20 @@
+import { InlineAnnotation } from "pages/annotate/Document"
 import { OntologyConcept } from "pages/dashboard/OntologyTable"
 import { IConfig } from "pages/setup/ConfigTable"
 import { atom } from "recoil"
 import { WorkspaceAnnotation, WorkspaceDocument } from "storage/database"
 
-const configState = atom({
+const activeTutorialStepState = atom({
+  key: "activeTutorialStepState",
+  default: 0,
+})
+
+const configState = atom<IConfig>({
   key: "configState",
-  default: {} as IConfig,
+  default: {
+    entities: [],
+    globalAttributes: [],
+  },
 })
 
 const activeEntityState = atom({
@@ -18,7 +27,7 @@ const entityColoursState = atom<Record<string, string>>({
   default: {},
 })
 
-const populatedAttributeState = atom<Record<string, string[]>>({
+const populatedAttributeState = atom<Record<string, string>>({
   key: "populatedAttributeState",
   default: {},
 })
@@ -46,7 +55,13 @@ const annotationsState = atom<WorkspaceAnnotation[][]>({
   default: [],
 })
 
+const proposedAnnotationState = atom<InlineAnnotation | null>({
+  key: "proposedAnnotationState",
+  default: null,
+})
+
 export {
+  activeTutorialStepState,
   configState,
   documentsState,
   documentIndexState,
@@ -55,4 +70,5 @@ export {
   populatedAttributeState,
   activeOntologyConceptState as activeOntologyConceptsState,
   annotationsState,
+  proposedAnnotationState,
 }

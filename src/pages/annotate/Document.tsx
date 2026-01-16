@@ -1,15 +1,17 @@
 import { ActionIcon, Button, Card, Divider, Grid, Group, Modal, ScrollArea, Select, TextInput, Text } from "@mantine/core"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconSearch } from "@tabler/icons"
-import { database, RawAnnotation, WorkspaceAnnotation, WorkspaceDocument } from "storage/database/Database"
+import { database, WorkspaceAnnotation, WorkspaceDocument } from "storage/database/Database"
 import { useEffect, useState } from "react"
 import { SectionProps } from "./Annotate"
 import { TextAnnotateBlend } from "react-text-annotate-blend"
 import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil"
-import { activeEntityState, activeOntologyConceptsState, annotationsState, documentIndexState, documentsState, entityColoursState, populatedAttributeState } from "storage/state/Annotate"
+import { activeEntityState, annotationsState, documentIndexState, documentsState, entityColoursState, proposedAnnotationState } from "storage/state/Annotate"
 import { useDebouncedState } from "@mantine/hooks"
+import notify from "utils/Notifications"
 import "./Document.css"
+import uuid from "react-uuid"
 
-interface InlineAnnotation {
+export interface InlineAnnotation {
   tag: string
   start: number
   end: number
@@ -19,51 +21,18 @@ interface InlineAnnotation {
 function Document({ workspace }: SectionProps) {
   const activeEntity = useRecoilValue(activeEntityState)
   const entityColours = useRecoilValue(entityColoursState)
-  const populatedAttributes = useRecoilValue(populatedAttributeState)
-  const activeOntologyConcept = useRecoilValue(activeOntologyConceptsState)
+  const [proposedAnnotation, setProposedAnnotation] = useRecoilState(proposedAnnotationState)
 
   const [documents, setDocuments] = useRecoilState(documentsState)
   const [documentIndex, setDocumentIndex] = useRecoilState(documentIndexState)
   const [annotations, setAnnotations] = useRecoilState(annotationsState)
   const [openedSearchDocumentModal, setOpenedSearchDocumentModal] = useState(false)
-  
+  const [inlineAnnotations, setInlineAnnotations] = useState<InlineAnnotation[]>([])
+
   const moveToFirstDocument = () => setDocumentIndex(0)
   const moveToPreviousDocument = () => setDocumentIndex(documentIndex - 1)
   const moveToNextDocument = () => setDocumentIndex(documentIndex + 1)
   const moveToLastDocument = () => setDocumentIndex(documents.length - 1)
-
-  const addAnnotation = (inlineAnnotation: InlineAnnotation) => {
-    const { tag, start, end } = inlineAnnotation
-
-    const documentId = documents[documentIndex].id
-    const text = documents[documentIndex].content.slice(start, end)
-
-    const allAttributes = {
-      ...populatedAttributes,
-    }
-
-    if (activeOntologyConcept.name && activeOntologyConcept.code) {
-      allAttributes["ontologyName"] = [activeOntologyConcept.name]
-      allAttributes["ontologyCode"] = [activeOntologyConcept.code]
-    }
-
-    const rawAnnotation = {
-      text,
-      entity: tag,
-      start_index: start,
-      end_index: end,
-      attributes: allAttributes,
-    } as RawAnnotation
-
-    database
-      .addWorkspaceAnnotation(documentId, rawAnnotation)
-      .then((annotation) => {
-        const copy = [...annotations]
-        copy[documentIndex] = [...copy[documentIndex], annotation]
-        setAnnotations(copy)
-      })
-      .catch(() => console.error("Failed to add annotation. Please try again later."))
-  }
 
   useEffect(() => {
     const newAnnotations: WorkspaceAnnotation[][] = []
@@ -81,7 +50,7 @@ function Document({ workspace }: SectionProps) {
     database
       .getWorkspaceDocuments(workspace.id)
       .then(setDocuments)
-      .catch(() => console.error("Failed to load documents. Please try again later."))
+      .catch((e) => notify.error("Failed to load documents.", e))
   }, [setDocuments, workspace.id])
 
   useEffect(() => {
@@ -92,8 +61,36 @@ function Document({ workspace }: SectionProps) {
     database
       .getWorkspaceAnnotations(documents.map(i => i.id))
       .then(setAnnotations)
-      .catch(() => console.error("Failed to load annotations. Please try again later."))
+      .catch((e) => notify.error("Failed to load annotations.", e))
   }, [documents, setAnnotations])
+
+  useEffect(() => {
+    const inlineAnnotations = annotations[documentIndex]?.map(annotation => {
+      const inlineAnnotation: InlineAnnotation = {
+        tag: "",
+        start: annotation.start_index,
+        end: annotation.end_index,
+        color: entityColours[annotation.entity],
+      }
+
+      return inlineAnnotation
+    })
+
+    if (proposedAnnotation) {
+      inlineAnnotations?.push({
+        tag: "",
+        start: proposedAnnotation.start,
+        end: proposedAnnotation.end,
+        color: "#6F72E9",
+      })
+    }
+
+    setInlineAnnotations(inlineAnnotations || [])
+  }, [annotations, documentIndex, entityColours, proposedAnnotation])
+
+  useEffect(() => {
+    setProposedAnnotation(null)
+  }, [documentIndex, setProposedAnnotation])
 
   return (
     <>
@@ -176,30 +173,13 @@ function Document({ workspace }: SectionProps) {
               <Grid.Col xs={12}>
                 <TextAnnotateBlend
                   content={documents[documentIndex].content}
-                  value={annotations[documentIndex]?.map(annotation => {
-                    const inlineAnnotation: InlineAnnotation = {
-                      tag: "",
-                      start: annotation.start_index,
-                      end: annotation.end_index,
-                      color: entityColours[annotation.entity],
-                    }
-
-                    return inlineAnnotation
-                  })}
+                  value={inlineAnnotations}
                   onChange={(updated) => {
-                    if (
-                      annotations[documentIndex].length >= updated.length ||
-                      updated.length === 0
-                    ) {
+                    if (annotations[documentIndex].length >= updated.length || updated.length === 0) {
                       return
                     }
 
-                    if (activeEntity === "") {
-                      console.error("You need to select an entity")
-                      return
-                    }
-
-                    addAnnotation(updated[updated.length - 1])
+                    setProposedAnnotation(updated[updated.length - 1])
                   }}
                   getSpan={(span) => ({
                     tag: activeEntity,
@@ -236,22 +216,34 @@ interface Props {
 function SearchDocumentModal({ documents, openedModal, setOpenedModal }: Props) {
   const setDocumentIndex = useSetRecoilState(documentIndexState)
 
-  const [availableDocuments, setAvailableDocuments] = useState<WorkspaceDocument[]>(documents)
   const [searchTerm, setSearchTerm] = useDebouncedState("", 200)
+  const [availableDocuments, setAvailableDocuments] = useState<Record<number, WorkspaceDocument>>({})
 
   useEffect(() => {
     if (searchTerm === "") {
-      setAvailableDocuments(documents)
-      return
-    }
+      const availableDocuments: Record<number, WorkspaceDocument> = {}
 
-    const filteredDocuments = documents.filter(document => {
-      return (
-        document.name.toLocaleLowerCase().includes(searchTerm) ||
-        document.content.toLocaleLowerCase().includes(searchTerm)
-      )
-    })
-    setAvailableDocuments(filteredDocuments)
+      documents.forEach((document, index) => {
+        availableDocuments[index] = document
+      })
+
+      setAvailableDocuments(availableDocuments)
+    } else {
+      const availableDocuments: Record<number, WorkspaceDocument> = {}
+
+      documents.forEach((document, index) => {
+        const isMatch = document
+          .content
+          .toLocaleLowerCase()
+          .includes(searchTerm)
+
+        if (isMatch) {
+          availableDocuments[index] = document
+        }
+      })
+
+      setAvailableDocuments(availableDocuments)
+    }
   }, [documents, searchTerm])
 
   return (
@@ -259,23 +251,28 @@ function SearchDocumentModal({ documents, openedModal, setOpenedModal }: Props) 
       size="xl"
       opened={openedModal}
       onClose={() => setOpenedModal(false)}
-      title="Document Finder"
+      title={
+        <Group position="left" spacing={5}>
+          <IconSearch size={16} />
+
+          <Text>
+            Search documents
+          </Text>
+        </Group>
+      }
       centered
     >
       <TextInput
         placeholder="Enter search term"
         size="md"
-        onChange={(e) => {
-          const searchTerm = e.currentTarget.value.toLocaleLowerCase()
-          setSearchTerm(searchTerm)
-        }}
+        onChange={(e) => setSearchTerm(e.currentTarget.value.toLocaleLowerCase())}
       />
 
       <Divider mt={20} mb={20} />
 
       <ScrollArea scrollbarSize={0} sx={{ height: 400 }}>
         <Grid>
-          {availableDocuments.length === 0 && (
+          {Object.keys(availableDocuments).length === 0 && (
             <Grid.Col xs={12}>
               <Text color="dimmed">
                 No matching documents found
@@ -283,41 +280,49 @@ function SearchDocumentModal({ documents, openedModal, setOpenedModal }: Props) 
             </Grid.Col>
           )}
 
-          {availableDocuments.map((document, index) => {
-            let content = (
+          {Object.keys(availableDocuments).map((documentIndex) => {
+            const parsedDocumentIndex = parseInt(documentIndex)
+            const document = availableDocuments[parsedDocumentIndex]
+
+            let documentSnippet = (
               <Text color="dimmed">
                 {document.content.slice(0, 250)}
               </Text>
             )
 
             if (searchTerm !== "") {
-              const firstMatch = document.content.search(searchTerm)
-              const before = document.content.slice(Math.max(firstMatch - 250, 0), firstMatch)
-              const after = document.content.slice(firstMatch + searchTerm.length, Math.min(firstMatch + 250, document.content.length))
+              // highlight search term (case insensitive) in yellow
+              const searchTermRegex = new RegExp(searchTerm, "gi")
+              const highlightedContent = document.content.replace(searchTermRegex, (match) => (
+                `<span style="background-color: #FDE047">${match}</span>`
+              ))
 
-              content = (
-                <Text color="dimmed">
-                  {document.content.search(searchTerm) > 0 && (
-                    <Text>
-                      {before}
+              // show up to 125 characters before and after the search term
+              const searchTermIndex = highlightedContent.indexOf(`<span style="background-color: #FDE047">`)
+              let snippetStartIndex = Math.max(0, searchTermIndex - 125)
+              let snippetEndIndex = Math.min(highlightedContent.length, searchTermIndex + 125)
 
-                      <span style={{ backgroundColor: "yellow" }}>
-                        {searchTerm}
-                      </span>
+              // if the search term is at the start or end of the document, show more characters
+              if (snippetStartIndex === 0) {
+                snippetEndIndex = Math.min(highlightedContent.length, snippetEndIndex + 125)
+              } else if (snippetEndIndex === highlightedContent.length) {
+                snippetStartIndex = Math.max(0, snippetStartIndex - 125)
+              }
 
-                      {after}
-                    </Text>
-                  )}
-                </Text>
+              documentSnippet = (
+                <Text
+                  dangerouslySetInnerHTML={{ __html: highlightedContent.slice(snippetStartIndex, snippetEndIndex) }}
+                  color="dimmed"
+                />
               )
             }
 
             return (
               <Grid.Col
                 xs={12}
-                key={index}
+                key={uuid()}
                 onClick={() => {
-                  setDocumentIndex(index)
+                  setDocumentIndex(parsedDocumentIndex)
                   setOpenedModal(false)
                 }}
               >
@@ -326,7 +331,7 @@ function SearchDocumentModal({ documents, openedModal, setOpenedModal }: Props) 
 
                   <Divider mt={10} mb={10} />
 
-                  {content}
+                  {documentSnippet}
                 </Card>
               </Grid.Col>
             )

@@ -1,4 +1,4 @@
-import { Group, Button, ActionIcon, Grid, Modal, TextInput, useMantineTheme, Text, Card, Table, Anchor, Center, Tooltip } from "@mantine/core"
+import { Group, Button, ActionIcon, Grid, Modal, TextInput, useMantineTheme, Text, Card, Table, Center, Tooltip } from "@mantine/core"
 import { Dropzone } from "@mantine/dropzone"
 import { IconFile, IconUpload, IconX, IconSearch, IconCheck, IconPlus, IconTrashX } from "@tabler/icons"
 import { DataTable } from "mantine-datatable"
@@ -10,6 +10,9 @@ import { useRecoilState } from "recoil"
 import { tutorialProgressState } from "storage/state/Dashboard"
 import { useDebouncedState } from "@mantine/hooks"
 import { useForm } from "@mantine/form"
+import notify from "utils/Notifications"
+import { Path } from "utils/Path"
+import { Link } from "react-router-dom"
 
 function OntologyTable() {
   const [openExploreModal, setOpenExploreModal] = useState(false)
@@ -29,8 +32,11 @@ function OntologyTable() {
     onConfirm: () => {
       database
         .deleteOntology(ontology.id, ontology.is_default)
-        .then(() => setOntologies(ontologies.filter(i => i.id !== ontology.id)))
-        .catch(() => console.error("Could not delete ontology. Please try again later."))
+        .then(() => {
+          setOntologies(ontologies.filter(i => i.id !== ontology.id))
+          notify.success(`Ontology '${ontology.name}' deleted.`)
+        })
+        .catch((e) => notify.error("Could not delete ontology.", e))
     },
     centered: true,
   })
@@ -41,9 +47,9 @@ function OntologyTable() {
 
   const refreshTable = () => {
     database
-      .getOntologies()
+      .getUserOntologies()
       .then(setOntologies)
-      .catch(() => console.error("Could not load ontologies. Please try again later."))
+      .catch((e) => notify.error("Could not load ontologies.", e))
   }
 
   return (
@@ -150,7 +156,7 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
     database
       .getDefaultOntologies()
       .then(setDefaultOntologies)
-      .catch(() => console.error("Could not load default ontologies. Please try again later."))
+      .catch((e) => notify.error("Could not load default ontologies.", e))
   }, [])
 
   const addOntology = (ontologyId: string) => {
@@ -159,15 +165,19 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
       .then(() => {
         const ontology = defaultOntologies.find(i => i.id === ontologyId)!
         setOntologies([...ontologies, ontology])
+        notify.success(`Ontology '${ontology.name}' added.`)
       })
-      .catch(() => console.error("Could not add ontology. Please try again later."))
+      .catch((e) => notify.error("Could not add ontology.", e))
   }
 
   const removeOntology = (ontologyId: string) => {
     database
       .removeDefaultOntology(ontologyId)
-      .then(() => setOntologies(ontologies.filter(i => i.id !== ontologyId)))
-      .catch(() => console.error("Could not remove ontology. Please try again later."))
+      .then(() => {
+        notify.success("Ontology removed.")
+        setOntologies(ontologies.filter(i => i.id !== ontologyId))
+      })
+      .catch((e) => notify.error("Could not remove ontology.", e))
   }
 
   return (
@@ -186,7 +196,17 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
 
       <Table>
         <tbody>
-          {defaultOntologies
+          {defaultOntologies.length === 0 && (
+            <tr>
+              <td colSpan={3}>
+                <Text size="sm" color="dimmed">
+                  No common ontologies added yet (coming soon).
+                </Text>
+              </td>
+            </tr>
+          )}
+
+          {defaultOntologies.length > 0 && defaultOntologies
             .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
             .map((defaultOntology) => {
               const isActive = ontologies.some(i => i.id === defaultOntology.id)
@@ -282,8 +302,9 @@ function UploadOntologyModal({ openedModal, setOpenedModal, refreshTable }: Moda
         setMappingFile(null)
         setOpenedModal(false)
         refreshTable!()
+        notify.success(`Ontology '${name}' uploaded.`)
       })
-      .catch(() => console.error("Could not upload ontology. Please try again later."))
+      .catch((e) => notify.error("Could not upload ontology.", e))
   }
 
   return (
@@ -329,7 +350,7 @@ function UploadOntologyModal({ openedModal, setOpenedModal, refreshTable }: Moda
             </Text>
 
             <Text size={13} color="dimmed" mb={2}>
-              Mappings must be a JSON file in the format defined <Anchor target="_blank" href="https://www.notion.so/Markup-Docs-91e9c5cfc6dc416fbcf2241d7c84e6c7">here</Anchor>.
+              Mappings must be a JSON file in the format defined <Link to={Path.Docs + "#add-an-ontology"} target="_blank">here</Link>.
             </Text>
 
             <Dropzone

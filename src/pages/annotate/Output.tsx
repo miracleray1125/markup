@@ -38,7 +38,7 @@ function Output({ workspace }: SectionProps) {
         copy[documentIndex] = [...copy[documentIndex].filter(i => i.id !== annotationId)]
         setAnnotations(copy)
       })
-      .catch(() => console.error("Failed to delete annotation. Please try again later."))
+      .catch((e) => notify.error("Failed to delete annotation.", e))
   }
 
   useEffect(() => {
@@ -75,7 +75,7 @@ function Output({ workspace }: SectionProps) {
           setGuideline(guidelines[0].content)
         }
       })
-      .catch(() => console.error("Failed to load guidelines. Please try again later."))
+      .catch((e) => notify.error("Failed to load guidelines.", e))
   }, [workspace.id])
 
   return (
@@ -130,7 +130,7 @@ function Output({ workspace }: SectionProps) {
                     label: (
                       <Center>
                         <Box ml={10}>
-                          Suggestions ({suggestionCount})
+                          Suggested ({suggestionCount})
                         </Box>
                       </Center>
                     ),
@@ -191,7 +191,7 @@ function Output({ workspace }: SectionProps) {
                                   {attributeType}
 
                                   <Text color="dimmed">
-                                    {annotation.attributes[attributeType].join(", ")}
+                                    {annotation.attributes[attributeType]}
                                   </Text>
                                 </Text>
                               ))}
@@ -207,15 +207,10 @@ function Output({ workspace }: SectionProps) {
 
             {segment === "suggestions" && (
               <Grid.Col xs={12}>
-                {isDemoSession && (
-                  <Text color="dimmed">
-                    Predictive annotations are disabled in demo sessions.
-                  </Text>
-                )}
-
-                {!isDemoSession && (
-                  <SmartAssistant setSuggestionCount={setSuggestionCount} />
-                )}
+                <SmartAssistant
+                  workspaceId={workspace.id}
+                  setSuggestionCount={setSuggestionCount}
+                />
               </Grid.Col>
             )}
           </Grid>
@@ -248,7 +243,7 @@ function ViewGuidelineModal({ guideline, openedModal, setOpenedModal }: ViewGuid
     >
       <ScrollArea scrollbarSize={0} sx={{ height: 400 }}>
         <Text color="dimmed">
-          {guideline || "No guidelines have been set for this workspace."}
+          {guideline || "No guidelines have been added to this workspace."}
         </Text>
       </ScrollArea>
     </Modal>

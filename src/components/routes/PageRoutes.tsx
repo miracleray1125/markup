@@ -6,15 +6,17 @@ import UnprotectedRoute from "./UnprotectedRoute"
 import { Path } from "utils/Path"
 import Home from "pages/home/Home"
 import NotFound from "pages/error/NotFound"
-import Contact from "pages/support/Contact"
 import Dashboard from "pages/dashboard/Dashboard"
 import ProtectedRoute from "./ProtectedRoute"
 import Setup from "pages/setup/Setup"
 import DefaultRoute from "./DefaultRoute"
 import Annotate from "pages/annotate/Annotate"
-import Verification from "pages/auth/Verification"
 import Settings from "pages/settings/Settings"
 import { DEMO_PATHS } from "utils/Demo"
+import Docs from "pages/docs/Docs"
+import Support from "pages/support/Support"
+import Faq from "pages/faq/Faq"
+import ResetPassword from "pages/auth/ResetPassword"
 
 function PageRoutes(): JSX.Element {
   return (
@@ -31,12 +33,6 @@ function PageRoutes(): JSX.Element {
         </UnprotectedRoute>
       } />
 
-      <Route path={Path.Verification} element={
-        <UnprotectedRoute title="Verify Email - Markup">
-          <Verification />
-        </UnprotectedRoute>
-      } />
-
       <Route path={Path.SignIn} element={
         <UnprotectedRoute title="Sign In - Markup">
           <SignIn />
@@ -44,9 +40,15 @@ function PageRoutes(): JSX.Element {
       } />
 
       <Route path={Path.ForgotPassword} element={
-        <UnprotectedRoute title="Sign In - Markup">
+        <UnprotectedRoute title="Forgot Password - Markup">
           <ForgotPassword />
         </UnprotectedRoute>
+      } />
+
+      <Route path={Path.ResetPassword} element={
+        <ProtectedRoute title="Reset Password - Markup">
+          <ResetPassword />
+        </ProtectedRoute>
       } />
 
       <Route path={Path.Dashboard} element={
@@ -70,9 +72,21 @@ function PageRoutes(): JSX.Element {
         </ProtectedRoute>
       } />
 
-      <Route path={Path.Contact} element={
-        <DefaultRoute title="Contact - Markup">
-          <Contact />
+      <Route path={Path.Support} element={
+        <DefaultRoute title="Support - Markup">
+          <Support />
+        </DefaultRoute>
+      } />
+
+      <Route path={Path.Faq} element={
+        <DefaultRoute title="FAQ - Markup">
+          <Faq />
+        </DefaultRoute>
+      } />
+
+      <Route path={Path.Docs} element={
+        <DefaultRoute title="Docs - Markup">
+          <Docs />
         </DefaultRoute>
       } />
 
