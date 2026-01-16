@@ -61,7 +61,7 @@ function Document({ workspace }: SectionProps) {
     database
       .getWorkspaceAnnotations(documents.map(i => i.id))
       .then(setAnnotations)
-      .catch((e) => notify.error("Failed to load annotations.", e))
+      .catch(() => notify.error("Failed to load annotations."))
   }, [documents, setAnnotations])
 
   useEffect(() => {

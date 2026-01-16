@@ -11,8 +11,6 @@ import { tutorialProgressState } from "storage/state/Dashboard"
 import { useDebouncedState } from "@mantine/hooks"
 import { useForm } from "@mantine/form"
 import notify from "utils/Notifications"
-import { Path } from "utils/Path"
-import { Link } from "react-router-dom"
 
 function OntologyTable() {
   const [openExploreModal, setOpenExploreModal] = useState(false)
@@ -156,7 +154,7 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
     database
       .getDefaultOntologies()
       .then(setDefaultOntologies)
-      .catch((e) => notify.error("Could not load default ontologies.", e))
+      .catch(() => notify.error("Could not load default ontologies."))
   }, [])
 
   const addOntology = (ontologyId: string) => {
@@ -167,7 +165,7 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
         setOntologies([...ontologies, ontology])
         notify.success(`Ontology '${ontology.name}' added.`)
       })
-      .catch((e) => notify.error("Could not add ontology.", e))
+      .catch(() => notify.error("Could not add ontology."))
   }
 
   const removeOntology = (ontologyId: string) => {

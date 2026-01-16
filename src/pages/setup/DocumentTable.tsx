@@ -38,7 +38,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
           setDocuments([...documents, ...insertedDocuments])
           notify.success(`${insertedDocuments.length} documents uploaded.`)
         })
-        .catch((e) => notify.error("Failed to upload documents.", e))
+        .catch(() => notify.error("Failed to upload documents."))
     }
 
     func()
@@ -198,14 +198,8 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
 
                       database
                         .deleteWorkspaceDocument(document.id)
-                        .then(() => {
-                          setDocuments(documents.filter(i => i.id !== document.id))
-
-                          const copy = { ...documentToAnnotationCount }
-                          delete copy[document.id]
-                          setDocumentToAnnotationCount(copy)
-                        })
-                        .catch((e) => notify.error("Failed to delete document.", e))
+                        .then(() => setDocuments(documents.filter(i => i.id !== document.id)))
+                        .catch(() => notify.error("Failed to delete document."))
                     }}
                   >
                     <IconTrashX
@@ -258,5 +252,5 @@ export default DocumentTable
 
 //   database
 //     .addWorkspaceAnnotations(documentId, Object.values(rawAnnotationMap))
-//     .catch(() => console.error("Failed to upload annotations. Please try again later."))
+//     .catch(() => notify.error("Failed to upload annotations."))
 // }

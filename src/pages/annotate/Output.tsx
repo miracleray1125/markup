@@ -8,6 +8,7 @@ import { SectionProps } from "./Annotate"
 import SmartAssistant from "./SmartAssistant"
 import { DEMO_DOMAINS } from "utils/Demo"
 import { exportJsonAnnotations } from "./ExportJsonAnnotations"
+import notify from "utils/Notifications"
 
 type Entity = string
 type AnnotationGroup = Record<Entity, WorkspaceAnnotation[]>
@@ -38,7 +39,7 @@ function Output({ workspace }: SectionProps) {
         copy[documentIndex] = [...copy[documentIndex].filter(i => i.id !== annotationId)]
         setAnnotations(copy)
       })
-      .catch((e) => notify.error("Failed to delete annotation.", e))
+      .catch(() => notify.error("Failed to delete annotation."))
   }
 
   useEffect(() => {

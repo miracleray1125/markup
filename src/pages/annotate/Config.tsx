@@ -8,11 +8,9 @@ import { SectionProps } from "./Annotate"
 import { Attribute } from "./ParseStandoffConfig"
 import distinctColors from "distinct-colors"
 import { OntologyConcept } from "pages/dashboard/OntologyTable"
+import { IConfig } from "pages/setup/ConfigTable"
+import { DEMO_DOMAINS } from "utils/Demo"
 import notify from "utils/Notifications"
-import Title from "components/title/Title"
-import EntityConfig from "components/annotate/EntityConfig"
-import AttributeConfig, { SelectData } from "components/annotate/AttributeConfig"
-import { IconNumber1, IconNumber2, IconNumber3, IconNumber4 } from "@tabler/icons"
 
 const SUGGEST_ENTITY_API_URL = "https://vior5kmthct3a7wzlpc4r6yy2i0iqfnc.lambda-url.eu-west-2.on.aws/"
 const SUGGEST_ATTRIBUTES_API_URL = "https://r6k5pux3iwubbplreajwa6ppoe0apqpf.lambda-url.eu-west-2.on.aws/"
@@ -32,11 +30,44 @@ function Config({ workspace }: SectionProps) {
   useEffect(() => {
     database
       .getWorkspaceConfig(workspace.id)
-      .then(config => {
-        const parsedConfig = parseJsonConfig(config.content)
-        setConfig(parsedConfig)
+      .then(configs => {
+        if (configs.length > 0) {
+          const config = JSON.parse(configs[0].content) as IConfig
+
+          const { entities, globalAttributes } = config
+
+          setConfig(config)
+          setEntities(entities.map(entity => entity.name))
+
+          const attributes: Attribute[] = []
+
+          entities.forEach((entity) => {
+            entity.attributes.forEach((attribute) => {
+              attributes.push({
+                name: attribute.name,
+                options: attribute.values,
+                targetEntity: entity.name,
+                allowCustomValues: attribute.allowCustomValues,
+                isGlobal: false,
+              })
+            })
+          })
+
+          globalAttributes.forEach((attribute) => {
+            attributes.push({
+              name: attribute.name,
+              options: attribute.values,
+              allowCustomValues: attribute.allowCustomValues,
+              isGlobal: true,
+            })
+          })
+
+          setAttributes(attributes)
+        } else {
+          notify.error("Failed to load workspace config.")
+        }
       })
-      .catch((e) => notify.error("Failed to load workspace config.", e))
+      .catch(() => notify.error("Failed to load workspace config."))
   }, [setConfig, workspace.id])
 
   useEffect(() => {

@@ -9,10 +9,6 @@ import { Workspace, WorkspaceConfig, database } from "storage/database/Database"
 import { SectionProps } from "./Setup"
 import { isValidConfig } from "pages/annotate/ParseJsonConfig"
 import notify from "utils/Notifications"
-import { parseJsonConfig } from "pages/annotate/ParseJsonConfig"
-import { parseStandoffConfig } from "../annotate/ParseStandoffConfig"
-import EntityConfig from "components/annotate/EntityConfig"
-import AttributeConfig from "components/annotate/AttributeConfig"
 
 export interface IConfig {
   entities: IConfigEntity[]
@@ -199,8 +195,8 @@ function ConfigTable({ workspace, workspaceStatus, setWorkspaceStatus }: Section
                       onClick={() => {
                         database
                           .deleteWorkspaceConfig(config.id)
-                          .then(() => setConfigRecord(null))
-                          .catch((e) => notify.error("Failed to delete config.", e))
+                          .then(() => setConfigs([]))
+                          .catch(() => notify.error("Failed to delete config."))
                       }}
                     >
                       <IconTrashX

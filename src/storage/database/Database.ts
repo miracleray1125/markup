@@ -3,6 +3,7 @@ import { supabase } from "../../utils/Supabase"
 import { OntologyConcept } from "pages/dashboard/OntologyTable"
 import { WorkspaceGuideline } from "pages/setup/GuidelinesTable"
 import uuid from "react-uuid"
+import notify from "utils/Notifications"
 
 export type Workspace = definitions["workspace"]
 export type WorkspaceAccess = definitions["workspace_access"]
@@ -78,7 +79,8 @@ async function getWorkspaces(): Promise<Record<string, Workspace[]>> {
     .eq("is_demo", false)
 
   if (workspaceAccessError) {
-    throw new Error(workspaceAccessError.message)
+    notify.error(workspaceAccessError.message ?? "Error")
+    return result
   }
 
   workspaceAccessData?.forEach((access) => {
@@ -206,7 +208,8 @@ async function addWorkspaceGuideline(workspaceId: string, file: File): Promise<W
     .select()
 
   if (error) {
-    throw new Error(error.message)
+    notify.error(error?.message ?? "Error")
+    return []
   }
 
   return config
@@ -219,7 +222,8 @@ async function deleteWorkspaceGuideline(guidelineId: string): Promise<boolean> {
     .eq("id", guidelineId)
 
   if (error) {
-    throw new Error(error.message)
+    notify.error(error?.message ?? "Error")
+    return true
   }
 
   return false
@@ -236,9 +240,8 @@ async function addWorkspaceConfig(id: string, workspaceId: string, name: string,
     })
     .select()
 
-  if (error) {
-    throw new Error(error.message)
-  }
+  if (error || config === null || config.length === 0) {
+    notify.error(error?.message ?? "Error")
 
   if (config === null || config.length === 0) {
     throw new Error("Invalid workspace config")
@@ -295,9 +298,8 @@ async function addWorkspaceAnnotation(
     })
     .select()
 
-  if (error) {
-    throw new Error(error.message)
-  }
+  if (error || annotation === null || annotation.length === 0) {
+    notify.error(error?.message ?? "Error")
 
   if (annotation === null || annotation.length === 0) {
     throw new Error("Invalid workspace annotation")
@@ -364,20 +366,29 @@ async function deleteWorkspaceAnnotation(annotationId: string): Promise<boolean>
     .eq("id", annotationId)
 
   if (error) {
-    throw new Error(error.message)
+    notify.error(error?.message ?? "Error")
+    return true
   }
 
   return false
 }
 
-async function addWorkspaceCollaborator(workspaceId: string, email: string): Promise<void> {
-  const { error } = await supabase
-    .functions
-    .invoke("add-collaborator", {
-      body: {
-        workspaceId,
-        email,
-      },
+async function addWorkspaceCollaborator(workspaceId: string, email: string): Promise<WorkspaceCollaborator> {
+  const { data: user, error: errorUser } = await supabase
+    .from("users")
+    .select()
+    .eq("email", email)
+
+  if (errorUser || user === null || user.length === 0) {
+    notify.error(errorUser?.message ?? "Error")
+    throw new Error("User not found")
+  }
+
+  const { data: access, error: errorAccess } = await supabase
+    .from("workspace_access")
+    .insert({
+      workspace_id: workspaceId,
+      user_id: user[0].id,
     })
 
   if (error) {
@@ -404,8 +415,9 @@ async function addWorkspaceCollaborator(workspaceId: string, email: string): Pro
     })
     .eq("id", workspaceId)
 
-  if (updateError) {
-    throw new Error(updateError.message)
+  if (errorUpdate) {
+    notify.error(errorUpdate?.message ?? "Error")
+    throw new Error("Error updating workspace")
   }
 }
 
@@ -440,7 +452,8 @@ async function removeWorkspaceCollaborator(workspaceId: string, email: string): 
     })
 
   if (error) {
-    throw new Error(error.message)
+    notify.error(error?.message ?? "Error")
+    return []
   }
 
   const { data: workspace, error: workspaceError } = await supabase
@@ -493,8 +506,9 @@ async function addOntology(name: string, description: string, rows: OntologyConc
       is_owner: true,
     })
 
-  if (ontologyAccessError) {
-    throw new Error(ontologyAccessError.message)
+  if (errorAccess) {
+    notify.error(errorAccess?.message ?? "Error")
+    return
   }
 
   const ontologyConcepts = rows.map(i => ({
@@ -559,7 +573,8 @@ async function getWorkspaceOntologies(workspaceId: string): Promise<Ontology[]> 
     .in("id", workspaceOntologyIds)
 
   if (error) {
-    throw new Error(error.message)
+    notify.error(error?.message ?? "Error")
+    return []
   }
 
   return data
@@ -589,7 +604,7 @@ async function removeDefaultOntology(ontologyId: string): Promise<void> {
     .eq("ontology_id", ontologyId)
 
   if (error) {
-    throw new Error(error.message)
+    notify.error(error?.message ?? "Error")
   }
 }
 
@@ -623,7 +638,8 @@ async function deleteOntology(ontologyId: string, isDefault: boolean): Promise<b
       .eq("id", ontologyId)
 
     if (ontologyError) {
-      throw new Error(ontologyError.message)
+      notify.error(ontologyError?.message ?? "Error")
+      return true
     }
   } else {
 

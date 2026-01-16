@@ -9,12 +9,6 @@ import Document from "./Document"
 import Config from "./Config"
 import notify from "utils/Notifications"
 import InvalidWorkspace from "pages/error/InvalidWorkspace"
-import Tutorial from "./Tutorial"
-import { DEMO_IDS } from "utils/Demo"
-
-export interface SectionProps {
-  workspace: Workspace
-}
 
 export interface SectionProps {
   workspace: Workspace
@@ -66,10 +60,6 @@ function Annotate() {
         <Container sx={{ width: "98%", maxWidth: "98%" }}>
           {workspace &&
             <Grid>
-              <Grid.Col xs={12} hidden={!isDemoWorkspace}>
-                <Tutorial />
-              </Grid.Col>
-
               <Grid.Col md={3}>
                 <Config workspace={workspace} />
               </Grid.Col>

@@ -100,7 +100,7 @@ function GuidelinesTable({ workspace }: SectionProps) {
                       database
                         .deleteWorkspaceGuideline(guideline.id)
                         .then(() => setGuidelines([]))
-                        .catch((e) => notify.error("Failed to delete guideline.", e))
+                        .catch(() => notify.error("Failed to delete guideline."))
                     }}
                   >
                     <IconTrashX

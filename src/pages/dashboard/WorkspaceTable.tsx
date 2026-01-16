@@ -52,7 +52,7 @@ function WorkspaceTable() {
         setWorkspaces(workspaces)
         setOwnedWorkspaceIds(ownedWorkspaces.map(i => i.id))
       })
-      .catch((e) => notify.error("Failed to load workspaces.", e))
+      .catch(() => notify.error("Failed to load workspaces."))
   }, [])
 
   return (
