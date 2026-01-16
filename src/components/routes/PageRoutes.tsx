@@ -11,12 +11,12 @@ import ProtectedRoute from "./ProtectedRoute"
 import Setup from "pages/setup/Setup"
 import DefaultRoute from "./DefaultRoute"
 import Annotate from "pages/annotate/Annotate"
-import Verification from "pages/auth/Verification"
 import Settings from "pages/settings/Settings"
 import { DEMO_PATHS } from "utils/Demo"
 import Docs from "pages/docs/Docs"
 import Support from "pages/support/Support"
 import Faq from "pages/faq/Faq"
+import ResetPassword from "pages/auth/ResetPassword"
 
 function PageRoutes(): JSX.Element {
   return (
@@ -33,12 +33,6 @@ function PageRoutes(): JSX.Element {
         </UnprotectedRoute>
       } />
 
-      <Route path={Path.Verification} element={
-        <UnprotectedRoute title="Verify Email - Markup">
-          <Verification />
-        </UnprotectedRoute>
-      } />
-
       <Route path={Path.SignIn} element={
         <UnprotectedRoute title="Sign In - Markup">
           <SignIn />
@@ -46,9 +40,15 @@ function PageRoutes(): JSX.Element {
       } />
 
       <Route path={Path.ForgotPassword} element={
-        <UnprotectedRoute title="Sign In - Markup">
+        <UnprotectedRoute title="Forgot Password - Markup">
           <ForgotPassword />
         </UnprotectedRoute>
+      } />
+
+      <Route path={Path.ResetPassword} element={
+        <ProtectedRoute title="Reset Password - Markup">
+          <ResetPassword />
+        </ProtectedRoute>
       } />
 
       <Route path={Path.Dashboard} element={

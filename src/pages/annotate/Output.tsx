@@ -76,7 +76,7 @@ function Output({ workspace }: SectionProps) {
           setGuideline(guidelines[0].content)
         }
       })
-      .catch(() => notify.error("Failed to load guidelines."))
+      .catch((e) => notify.error("Failed to load guidelines.", e))
   }, [workspace.id])
 
   return (
@@ -131,7 +131,7 @@ function Output({ workspace }: SectionProps) {
                     label: (
                       <Center>
                         <Box ml={10}>
-                          Suggestions ({suggestionCount})
+                          Suggested ({suggestionCount})
                         </Box>
                       </Center>
                     ),
@@ -192,7 +192,7 @@ function Output({ workspace }: SectionProps) {
                                   {attributeType}
 
                                   <Text color="dimmed">
-                                    {annotation.attributes[attributeType].join(", ")}
+                                    {annotation.attributes[attributeType]}
                                   </Text>
                                 </Text>
                               ))}
@@ -208,19 +208,10 @@ function Output({ workspace }: SectionProps) {
 
             {segment === "suggestions" && (
               <Grid.Col xs={12}>
-                <Text color="dimmed">
-                  Predictive annotations are currently disabled.
-                </Text>
-
-                {/* {isDemoSession && (
-                  <Text color="dimmed">
-                    Predictive annotations are disabled in demo sessions.
-                  </Text>
-                )}
-
-                {!isDemoSession && (
-                  <SmartAssistant workspaceId={workspace.id} setSuggestionCount={setSuggestionCount} />
-                )} */}
+                <SmartAssistant
+                  workspaceId={workspace.id}
+                  setSuggestionCount={setSuggestionCount}
+                />
               </Grid.Col>
             )}
           </Grid>

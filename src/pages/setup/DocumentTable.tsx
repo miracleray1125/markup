@@ -1,21 +1,30 @@
 import { Group, Button, ActionIcon, Text, FileButton, Tooltip, Card } from "@mantine/core"
 import { IconFilePlus, IconTrashX } from "@tabler/icons"
 import { DataTable } from "mantine-datatable"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import uuid from "react-uuid"
-import { database, RawAnnotation, WorkspaceDocument } from "storage/database/Database"
+import { database, WorkspaceDocument } from "storage/database/Database"
 import notify from "utils/Notifications"
+import { parseJsonAnnotations } from "./ParseJsonAnnotations"
+import { parseStandoffAnnotations } from "./ParseStandoffAnnotations"
 import { SectionProps } from "./Setup"
 
 function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: SectionProps) {
   const [documents, setDocuments] = useState<WorkspaceDocument[]>([])
   const [documentFiles, setDocumentFiles] = useState<File[]>([])
+  const [annotationFiles, setAnnotationFiles] = useState<File[]>([])
+
+  const uploadAnnotations = useCallback(async (documentId: string, file: File) => {
+    database
+      .addWorkspaceAnnotations(workspace.id, documentId, file)
+      .catch((e) => notify.error("Failed to upload annotations.", e))
+  }, [workspace.id])
 
   useEffect(() => {
     database
       .getWorkspaceDocuments(workspace.id)
       .then(setDocuments)
-      .catch(() => notify.error("Failed to load documents."))
+      .catch((e) => notify.error("Failed to load documents.", e))
   }, [workspace.id])
 
   useEffect(() => {
@@ -27,6 +36,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
         .then(insertedDocuments => {
           setDocumentFiles([])
           setDocuments([...documents, ...insertedDocuments])
+          notify.success(`${insertedDocuments.length} documents uploaded.`)
         })
         .catch(() => notify.error("Failed to upload documents."))
     }
@@ -34,14 +44,20 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
     func()
   }, [documents, documentFiles, workspace.id])
 
-  const uploadAnnotations = async (documentId: string, file: File) => {
-    const content = await file.text()
-    const annotations = JSON.parse(content) as RawAnnotation[]
+  useEffect(() => {
+    annotationFiles.forEach(annotationFile => {
+      const document = documents.find(document => {
+        const documentFileName = document.name.split(".").slice(0, -1).join(".")
+        const annotationFileName = annotationFile.name.split(".").slice(0, -1).join(".")
 
-    database
-      .addWorkspaceAnnotations(workspace.id, documentId, annotations)
-      .catch(() => notify.error("Failed to upload annotations."))
-  }
+        return documentFileName === annotationFileName
+      })
+
+      if (document) {
+        uploadAnnotations(document.id, annotationFile)
+      }
+    })
+  }, [annotationFiles, documents, uploadAnnotations, workspace.id])
 
   useEffect(() => {
     if (setWorkspaceStatus === undefined) return
@@ -58,6 +74,27 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
       })
     }
   }, [documents, workspaceStatus, setWorkspaceStatus])
+
+  useEffect(() => {
+    const documentIds = documents.map(document => document.id)
+
+    database
+      .getWorkspaceAnnotations(documentIds)
+      .then(documentAnnotations => {
+        const documentToAnnotationCount = {} as Record<string, number>
+
+        documentAnnotations.forEach(documentAnnotation => {
+          if (documentAnnotation.length > 0) {
+            const documentId = documentAnnotation[0].document_id
+
+            documentToAnnotationCount[documentId] = documentAnnotation.length
+          }
+        })
+
+        setDocumentToAnnotationCount(documentToAnnotationCount)
+      })
+      .catch((e) => notify.error("Failed to load annotations.", e))
+  }, [documents])
 
   return (
     <Card shadow="xs" radius={5}>
@@ -92,9 +129,17 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
                   {document.name}
                 </Text>
 
-                <Text size="sm" color="dimmed">
-                  No annotations
-                </Text>
+                {documentToAnnotationCount[document.id] && (
+                  <Text size="sm" color="dimmed">
+                    {documentToAnnotationCount[document.id]} annotations
+                  </Text>
+                )}
+
+                {!documentToAnnotationCount[document.id] && (
+                  <Text size="sm" color="dimmed">
+                    No annotations
+                  </Text>
+                )}
               </>
             ),
           },
@@ -102,7 +147,15 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
             accessor: "actions",
             title: (
               <Group position="right">
-                <FileButton onChange={setDocumentFiles} accept=".txt" multiple  key={uuid()}>
+                <FileButton onChange={setAnnotationFiles} accept=".json,.ann" multiple key={uuid()}>
+                  {(props) => (
+                    <Button {...props} variant="light">
+                      Upload annotations
+                    </Button>
+                  )}
+                </FileButton>
+
+                <FileButton onChange={setDocumentFiles} accept=".txt" multiple key={uuid()}>
                   {(props) => (
                     <Button {...props}>
                       Upload documents
@@ -115,7 +168,7 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
             render: (document) => (
               <Group spacing={8} position="right" noWrap>
                 <FileButton
-                  accept=".json"
+                  accept=".json,.ann"
                   onChange={(file) => {
                     if (file) {
                       uploadAnnotations(document.id, file)

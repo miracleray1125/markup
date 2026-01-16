@@ -21,7 +21,7 @@ function GuidelinesTable({ workspace }: SectionProps) {
     database
       .getWorkspaceGuideline(workspace.id)
       .then((guidelines) => setGuidelines(guidelines))
-      .catch(() => notify.error("Failed to load guidelines."))
+      .catch((e) => notify.error("Failed to load guidelines.", e))
   }, [workspace.id])
 
   useEffect(() => {
@@ -34,7 +34,7 @@ function GuidelinesTable({ workspace }: SectionProps) {
           setFile(null)
           setGuidelines(guidelines)
         })
-        .catch(() => notify.error("Failed to upload guidelines."))
+        .catch((e) => notify.error("Failed to upload guidelines.", e))
     }
 
     func()

@@ -1,4 +1,4 @@
-import { Group, Button, ActionIcon, Grid, Modal, TextInput, useMantineTheme, Text, Card, Table, Anchor, Center, Tooltip } from "@mantine/core"
+import { Group, Button, ActionIcon, Grid, Modal, TextInput, useMantineTheme, Text, Card, Table, Center, Tooltip } from "@mantine/core"
 import { Dropzone } from "@mantine/dropzone"
 import { IconFile, IconUpload, IconX, IconSearch, IconCheck, IconPlus, IconTrashX } from "@tabler/icons"
 import { DataTable } from "mantine-datatable"
@@ -34,7 +34,7 @@ function OntologyTable() {
           setOntologies(ontologies.filter(i => i.id !== ontology.id))
           notify.success(`Ontology '${ontology.name}' deleted.`)
         })
-        .catch(() => notify.error("Could not delete ontology."))
+        .catch((e) => notify.error("Could not delete ontology.", e))
     },
     centered: true,
   })
@@ -45,9 +45,9 @@ function OntologyTable() {
 
   const refreshTable = () => {
     database
-      .getOntologies()
+      .getUserOntologies()
       .then(setOntologies)
-      .catch(() => notify.error("Could not load ontologies."))
+      .catch((e) => notify.error("Could not load ontologies.", e))
   }
 
   return (
@@ -175,7 +175,7 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
         notify.success("Ontology removed.")
         setOntologies(ontologies.filter(i => i.id !== ontologyId))
       })
-      .catch(() => notify.error("Could not remove ontology."))
+      .catch((e) => notify.error("Could not remove ontology.", e))
   }
 
   return (
@@ -194,7 +194,17 @@ function ExploreOntologiesModal({ openedModal, setOpenedModal, ontologies, setOn
 
       <Table>
         <tbody>
-          {defaultOntologies
+          {defaultOntologies.length === 0 && (
+            <tr>
+              <td colSpan={3}>
+                <Text size="sm" color="dimmed">
+                  No common ontologies added yet (coming soon).
+                </Text>
+              </td>
+            </tr>
+          )}
+
+          {defaultOntologies.length > 0 && defaultOntologies
             .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
             .map((defaultOntology) => {
               const isActive = ontologies.some(i => i.id === defaultOntology.id)
@@ -292,7 +302,7 @@ function UploadOntologyModal({ openedModal, setOpenedModal, refreshTable }: Moda
         refreshTable!()
         notify.success(`Ontology '${name}' uploaded.`)
       })
-      .catch(() => notify.error("Could not upload ontology."))
+      .catch((e) => notify.error("Could not upload ontology.", e))
   }
 
   return (
@@ -338,7 +348,7 @@ function UploadOntologyModal({ openedModal, setOpenedModal, refreshTable }: Moda
             </Text>
 
             <Text size={13} color="dimmed" mb={2}>
-              Mappings must be a JSON file in the format defined <Anchor target="_blank" href="https://www.notion.so/Markup-Docs-91e9c5cfc6dc416fbcf2241d7c84e6c7">here</Anchor>.
+              Mappings must be a JSON file in the format defined <Link to={Path.Docs + "#add-an-ontology"} target="_blank">here</Link>.
             </Text>
 
             <Dropzone

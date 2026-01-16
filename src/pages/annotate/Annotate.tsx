@@ -19,6 +19,7 @@ function Annotate() {
 
   const [invalidWorkspace, setInvalidWorkspace] = useState(false)
   const [workspace, setWorkspace] = useState<Workspace>()
+  const [isDemoWorkspace, setIsDemoWorkspace] = useState(false)
 
   useEffect(() => {
     if (id === undefined) {
@@ -41,6 +42,12 @@ function Annotate() {
         notify.error("Failed to load workspace.")
         moveToPage(Path.Dashboard)
       })
+  }, [id])
+
+  useEffect(() => {
+    if (id) {
+      setIsDemoWorkspace(DEMO_IDS.includes(id))
+    }
   }, [id])
 
   return (
