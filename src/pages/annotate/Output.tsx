@@ -4,19 +4,14 @@ import { useEffect, useState } from "react"
 import { useRecoilState, useRecoilValue } from "recoil"
 import { database, WorkspaceAnnotation } from "storage/database"
 import { annotationsState, documentIndexState, documentsState, entityColoursState } from "storage/state/Annotate"
-import { SectionProps } from "./Interfaces"
-import JSZip from "jszip"
-import { saveAs } from "file-saver"
-import SmartAssistant from "./SmartAssistant"
+import { SectionProps } from "./Annotate"
 import { DEMO_DOMAINS } from "utils/Demo"
+import { exportJsonAnnotations } from "./ExportJsonAnnotations"
+import notify from "utils/Notifications"
+import SmartAssistant from "./SmartAssistant"
 
 type Entity = string
 type AnnotationGroup = Record<Entity, WorkspaceAnnotation[]>
-
-interface AnnotationOutput {
-  name: string
-  payload: string[]
-}
 
 function Output({ workspace }: SectionProps) {
   const entityColours = useRecoilValue(entityColoursState)
@@ -36,80 +31,6 @@ function Output({ workspace }: SectionProps) {
     setIsDemoSession(DEMO_DOMAINS.map(domain => domain.id).includes(workspace.id))
   }, [workspace.id])
 
-  const exportAnnotations = async () => {
-    const outputs = [] as AnnotationOutput[]
-
-    documents.forEach((doc, index) => {
-      const name = doc.name
-      const output = buildSingleOutput(name, annotations[index])
-
-      outputs.push(output)
-    })
-
-    saveAsZip(outputs)
-  }
-
-  function saveAsZip(outputs: AnnotationOutput[]): void {
-    const zip = new JSZip()
-
-    outputs.forEach((output: AnnotationOutput) => {
-      if (output.name && output.payload) {
-        zip.file(output.name, output.payload.join(""))
-      }
-    })
-
-    zip
-      .generateAsync({ type: "blob" })
-      .then((content) => {
-        saveAs(content, "annotations.zip")
-      })
-  }
-
-  function buildSingleOutput(name: string, annotations: WorkspaceAnnotation[]): AnnotationOutput {
-    return {
-      name: name.split(".txt")[0] + ".ann",
-      payload: buildExportRows(annotations),
-    }
-  }
-
-  function buildExportRows(annotations: WorkspaceAnnotation[]): string[] {
-    const rows = [] as string[]
-
-    let annotationId = 1
-    let attributeId = 1
-
-    const addAnnotationRow = (annotation: WorkspaceAnnotation) => {
-      const { entity, start_index, end_index, text } = annotation
-      const normalizedText = normalizeText(text)
-      const output = `T${annotationId}\t${entity} ${start_index} ${end_index}\t${normalizedText}\n`
-      rows.push(output)
-    }
-
-    const addAttributeRow = (annotation: WorkspaceAnnotation) => {
-      const { attributes } = annotation
-
-      Object.entries(attributes).forEach(([name, value]) => {
-        const output = `A${attributeId}\t${name} T${annotationId} ${value}\n`
-        rows.push(output)
-        attributeId++
-      })
-    }
-
-    annotations.forEach((annotation: WorkspaceAnnotation) => {
-      addAnnotationRow(annotation)
-      addAttributeRow(annotation)
-      annotationId++
-    })
-
-    return rows
-  }
-
-  function normalizeText(text: string): string {
-    return text
-      .split(/ |\n|\t/)
-      .join("-")
-  }
-
   const deleteAnnotation = (annotationId: string) => {
     database
       .deleteWorkspaceAnnotation(annotationId)
@@ -118,6 +39,7 @@ function Output({ workspace }: SectionProps) {
         copy[documentIndex] = [...copy[documentIndex].filter(i => i.id !== annotationId)]
         setAnnotations(copy)
       })
+      .catch((e) => notify.error("Failed to delete annotation.", e))
   }
 
   useEffect(() => {
@@ -154,7 +76,7 @@ function Output({ workspace }: SectionProps) {
           setGuideline(guidelines[0].content)
         }
       })
-      .catch(alert)
+      .catch((e) => notify.error("Failed to load guidelines.", e))
   }, [workspace.id])
 
   return (
@@ -175,7 +97,7 @@ function Output({ workspace }: SectionProps) {
                 <Button
                   variant="subtle"
                   leftIcon={<IconDownload size={16} />}
-                  onClick={exportAnnotations}
+                  onClick={() => exportJsonAnnotations(documents, annotations)}
                 >
                   Export
                 </Button>
@@ -209,7 +131,7 @@ function Output({ workspace }: SectionProps) {
                     label: (
                       <Center>
                         <Box ml={10}>
-                          Suggestions ({suggestionCount})
+                          Suggested ({suggestionCount})
                         </Box>
                       </Center>
                     ),
@@ -270,7 +192,7 @@ function Output({ workspace }: SectionProps) {
                                   {attributeType}
 
                                   <Text color="dimmed">
-                                    {annotation.attributes[attributeType].join(", ")}
+                                    {annotation.attributes[attributeType]}
                                   </Text>
                                 </Text>
                               ))}
@@ -286,15 +208,10 @@ function Output({ workspace }: SectionProps) {
 
             {segment === "suggestions" && (
               <Grid.Col xs={12}>
-                {isDemoSession && (
-                  <Text color="dimmed">
-                    Predictive annotations are disabled in demo sessions.
-                  </Text>
-                )}
-
-                {!isDemoSession && (
-                  <SmartAssistant setSuggestionCount={setSuggestionCount} />
-                )}
+                <SmartAssistant
+                  workspaceId={workspace.id}
+                  setSuggestionCount={setSuggestionCount}
+                />
               </Grid.Col>
             )}
           </Grid>
@@ -327,7 +244,7 @@ function ViewGuidelineModal({ guideline, openedModal, setOpenedModal }: ViewGuid
     >
       <ScrollArea scrollbarSize={0} sx={{ height: 400 }}>
         <Text color="dimmed">
-          {guideline || "No guidelines have been set for this workspace."}
+          {guideline || "No guidelines have been added to this workspace."}
         </Text>
       </ScrollArea>
     </Modal>

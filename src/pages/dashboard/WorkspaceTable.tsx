@@ -10,7 +10,7 @@ import { toSetupUrl } from "utils/Path"
 import { openConfirmModal } from "@mantine/modals"
 import { tutorialProgressState } from "storage/state/Dashboard"
 import { useRecoilState } from "recoil"
-import { supabase } from "utils/Supabase"
+import notify from "utils/Notifications"
 
 function WorkspaceTable() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -32,9 +32,13 @@ function WorkspaceTable() {
     onConfirm: () => {
       database
         .deleteWorkspace(workspace.id)
-        .then(() => setWorkspaces(workspaces.filter(i => i.id !== workspace.id)))
-        .catch(alert)
+        .then(() => {
+          setWorkspaces(workspaces.filter(i => i.id !== workspace.id))
+          notify.success(`The workspace '${workspace.name}' has been deleted successfully.`)
+        })
+        .catch((e) => notify.error(`Failed to delete the workspace '${workspace.name}'.`, e))
     },
+    centered: true,
   })
 
   useEffect(() => {
@@ -48,6 +52,7 @@ function WorkspaceTable() {
         setWorkspaces(workspaces)
         setOwnedWorkspaceIds(ownedWorkspaces.map(i => i.id))
       })
+      .catch((e) => notify.error("Failed to load workspaces.", e))
   }, [])
 
   return (
@@ -186,14 +191,11 @@ function CreateWorkspaceModal({ openedModal, setOpenedModal }: ModalProps) {
 
   const handleCreateWorkspace = async (form: CreateWorkspaceForm) => {
     const { name, description } = form
-    const workspaces = await database.addWorkspace(name, description || "")
-
-    if (workspaces.length === 0) {
-      alert("Failed to create workspace")
-      return
-    }
-
-    moveToPage(toSetupUrl(workspaces[0].id))
+    
+    await database
+      .addWorkspace(name, description || "")
+      .then (workspaceId => moveToPage(toSetupUrl(workspaceId)))
+      .catch((e) => notify.error("Failed to create workspace.", e))
   }
 
   return (
@@ -253,20 +255,7 @@ interface ManageCollaboratorsModalProps {
 }
 
 function ManageCollaboratorsModal({ workspace, openedModal, setOpenedModal }: ManageCollaboratorsModalProps) {
-  const [collaborators, setCollaborators] = useState<WorkspaceCollaborator[]>([])
-  const [userId, setUserId] = useState("")
-
-  useEffect(() => {
-    const f = async () => {
-      const { data } = await supabase.auth.getUser()
-
-      if (data && data.user) {
-        setUserId(data.user.id)
-      }
-    }
-
-    f()
-  }, [])
+  const [collaboratorEmails, setCollaboratorEmails] = useState<string[]>([])
 
   const form = useForm({
     initialValues: {
@@ -277,13 +266,32 @@ function ManageCollaboratorsModal({ workspace, openedModal, setOpenedModal }: Ma
   const handleAddCollaborator = async (email: string) => {
     database
       .addWorkspaceCollaborator(workspace.id, email)
-      .then((collaborator) => setCollaborators([...collaborators, collaborator]))
+      .then(() => {
+        setCollaboratorEmails([...collaboratorEmails, email])
+        notify.success(`Added ${email} as a collaborator.`)
+      })
+      .catch((e) => notify.error(`Failed to add  ${email} as a collaborator.`, e))
+  }
+
+  const handleRemoveCollaborator = async (email: string) => {
+    database
+      .removeWorkspaceCollaborator(workspace.id, email)
+      .then(() => {
+        setCollaboratorEmails(collaboratorEmails.filter(c => c !== email))
+        notify.success(`Removed ${email} as a collaborator.`)
+      })
+      .catch((e) => notify.error(`Failed to remove ${email} as a collaborator.`, e))
   }
 
   useEffect(() => {
-    database
-      .getWorkspaceCollaborators(workspace.id)
-      .then(setCollaborators)
+    const f = async () => {
+      database
+        .getWorkspaceCollaboratorEmails(workspace.id)
+        .then(emails => setCollaboratorEmails(emails))
+        .catch((e) => notify.error("Failed to get collaborators.", e))
+    }
+
+    f()
   }, [workspace.id])
 
   return (
@@ -295,21 +303,17 @@ function ManageCollaboratorsModal({ workspace, openedModal, setOpenedModal }: Ma
     >
       <form onSubmit={form.onSubmit((values) => handleAddCollaborator(values.email))}>
         <Grid>
-          {collaborators.map((collaborator, index) => {
-            if (collaborator.user_id === userId) {
-              return null
-            }
-
+          {collaboratorEmails.map((collaboratorEmail, index) => {
             return (
               <Grid.Col xs={12}>
                 <Group position="apart" noWrap>
                   <Group position="left" noWrap>
                     <Avatar key={index} radius="xl" color="primary">
-                      {collaborator.email.slice(0, 2)}
+                      {collaboratorEmail.slice(0, 2)}
                     </Avatar>
 
                     <Text>
-                      {collaborator.email}
+                      {collaboratorEmail}
                     </Text>
                   </Group>
 
@@ -317,6 +321,7 @@ function ManageCollaboratorsModal({ workspace, openedModal, setOpenedModal }: Ma
                     <ActionIcon
                       variant="subtle"
                       color="red"
+                      onClick={() => handleRemoveCollaborator(collaboratorEmail)}
                     >
                       <IconTrashX size={16} />
                     </ActionIcon>
@@ -333,10 +338,10 @@ function ManageCollaboratorsModal({ workspace, openedModal, setOpenedModal }: Ma
                 placeholder="Enter their email"
                 description={
                   <>
-                    Collaborators will have full access to the
+                    Collaborators will have full edit access to the
                     workspace <b>{workspace.name}</b>. You can revoke
                     their access at any time. The provided email
-                    must be associated with an existing Markup user account.
+                    must be associated with a registered Markup user account.
                   </>
                 }
                 {...form.getInputProps("email")}

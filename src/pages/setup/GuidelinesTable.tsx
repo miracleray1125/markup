@@ -1,8 +1,10 @@
-import { Group, Button, ActionIcon, Text, FileButton, Card } from "@mantine/core"
+import { Group, Button, ActionIcon, Text, FileButton, Card, Tooltip } from "@mantine/core"
 import { IconTrashX } from "@tabler/icons"
 import { DataTable } from "mantine-datatable"
 import { useEffect, useState } from "react"
+import uuid from "react-uuid"
 import { database } from "storage/database/Database"
+import notify from "utils/Notifications"
 import { SectionProps } from "./Setup"
 
 export interface WorkspaceGuideline {
@@ -19,6 +21,7 @@ function GuidelinesTable({ workspace }: SectionProps) {
     database
       .getWorkspaceGuideline(workspace.id)
       .then((guidelines) => setGuidelines(guidelines))
+      .catch((e) => notify.error("Failed to load guidelines.", e))
   }, [workspace.id])
 
   useEffect(() => {
@@ -31,6 +34,7 @@ function GuidelinesTable({ workspace }: SectionProps) {
           setFile(null)
           setGuidelines(guidelines)
         })
+        .catch((e) => notify.error("Failed to upload guidelines.", e))
     }
 
     func()
@@ -77,7 +81,7 @@ function GuidelinesTable({ workspace }: SectionProps) {
             accessor: "actions",
             title: (
               <Group position="right" noWrap>
-                <FileButton onChange={setFile} accept=".txt">
+                <FileButton onChange={setFile} accept=".txt" key={uuid()}>
                   {(props) => (
                     <Button {...props}>
                       Upload guidelines
@@ -89,20 +93,22 @@ function GuidelinesTable({ workspace }: SectionProps) {
             textAlignment: "right",
             render: (guideline) => (
               <Group spacing={8} position="right" noWrap>
-                <ActionIcon
-                  color="primary"
-                  onClick={() => {
-                    database
-                      .deleteWorkspaceGuideline(guideline.id)
-                      .then(() => setGuidelines([]))
-                      .catch(alert)
-                  }}
-                >
-                  <IconTrashX
-                    size={16}
-                    style={{ color: "rgb(217 138 138)" }}
-                  />
-                </ActionIcon>
+                <Tooltip label="Delete guidelines">
+                  <ActionIcon
+                    color="primary"
+                    onClick={() => {
+                      database
+                        .deleteWorkspaceGuideline(guideline.id)
+                        .then(() => setGuidelines([]))
+                        .catch((e) => notify.error("Failed to delete guideline.", e))
+                    }}
+                  >
+                    <IconTrashX
+                      size={16}
+                      style={{ color: "rgb(217 138 138)" }}
+                    />
+                  </ActionIcon>
+                </Tooltip>
               </Group>
             ),
           },

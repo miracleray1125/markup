@@ -27,16 +27,19 @@ function SignUp(): JSX.Element {
     const { email, password, passwordConf } = submitted
 
     if (password !== passwordConf) {
-      alert("Those passwords don't match. Please try again!")
+      form.setErrors({
+        password: "Those passwords don't match. Please try again!",
+        passwordConf: "Those passwords don't match. Please try again!",
+      })
       return
     }
 
     const { error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
-      alert(error)
+      form.setErrors({ email: error.message })
     } else {
-      moveToPage(Path.Verification)
+      moveToPage(Path.Dashboard)
     }
   }
 
