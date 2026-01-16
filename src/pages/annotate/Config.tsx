@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Card, Collapse, Grid, Group, MultiSelect, Radio, ScrollArea, Text, Tooltip } from "@mantine/core"
+import { ActionIcon, Button, Card, Collapse, Grid, Group, MultiSelect, Radio, ScrollArea, Select, Text, Tooltip } from "@mantine/core"
 import { IconCaretDown, IconCaretRight, IconInfoCircle } from "@tabler/icons"
 import { database } from "storage/database/Database"
 import { useState, useEffect } from "react"
