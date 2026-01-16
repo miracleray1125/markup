@@ -1,5 +1,6 @@
-import { Button, Card, Code, Grid, Group, ScrollArea, Select, Text } from "@mantine/core"
-import { RawAnnotation, database } from "storage/database/Database"
+import { ActionIcon, Button, Card, Collapse, Grid, Group, MultiSelect, Radio, ScrollArea, Text, Tooltip } from "@mantine/core"
+import { IconCaretDown, IconCaretRight, IconInfoCircle } from "@tabler/icons"
+import { database } from "storage/database/Database"
 import { useState, useEffect } from "react"
 import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil"
 import { activeEntityState, activeOntologyConceptsState, activeTutorialStepState, annotationsState, configState, documentIndexState, documentsState, populatedAttributeState, proposedAnnotationState } from "storage/state/Annotate"
@@ -280,40 +281,52 @@ function Config({ workspace }: SectionProps) {
           </Grid.Col>
 
           <Grid.Col xs={12}>
-            <Group position="left" spacing={4} mb={10}>
-              <Text size="xs">
-                Suggested:
-              </Text>
+            <Collapse in={attributeSectionOpen}>
+              {activeEntity === "" && shownAttributes.length === 0 &&
+                <Text color="dimmed">
+                  Select entity to see attributes
+                </Text>
+              }
 
-              {Object.keys(suggestedAttributes).length === 0 && (
-                <Button
-                  variant="subtle"
-                  size="xs"
-                  p={0}
-                >
-                  NA
-                </Button>
-              )}
+              {activeEntity !== "" && shownAttributes.length === 0 &&
+                <Text color="dimmed">
+                  Selected entity has no attributes
+                </Text>
+              }
 
-              {Object.keys(suggestedAttributes).map((attribute) => (
-                <Button
-                  key={attribute}
-                  variant="subtle"
-                  size="xs"
-                  p={0}
-                  mr={5}
-                  onClick={() => {
-                    const copy = { ...populatedAttributes }
-                    copy[attribute] = suggestedAttributes[attribute]
-                    setPopulatedAttributes(copy)
-                  }}
-                >
-                  {attribute} ({suggestedAttributes[attribute]})
-                </Button>
-              ))}
-            </Group>
+              {shownAttributes.length > 0 &&
+                <Group mb={20}>
+                  <Grid sx={{ width: "100%" }}>
+                    {shownAttributes.map((attribute, index) => (
+                      <Grid.Col xs={12} key={index}>
+                        <MultiSelect
+                          maxSelectedValues={100}
+                          data={attribute.options}
+                          placeholder={attribute.name}
+                          size="sm"
+                          key={index + attribute.name}
+                          onChange={(value) => {
+                            const copy = { ...populatedAttributes }
 
-            <AttributeConfig config={config} />
+                            if (value.length > 0) {
+                              copy[attribute.name] = value
+                            } else if (Object.keys(copy).includes(attribute.name)) {
+                              delete copy[attribute.name]
+                            }
+
+                            setPopulatedAttributes(copy)
+                          }}
+                          searchable
+                          clearable
+                          creatable={attribute.allowCustomValues}
+                          getCreateLabel={(query) => `+ Create ${query}`}
+                        />
+                      </Grid.Col>
+                    ))}
+                  </Grid>
+                </Group>
+              }
+            </Collapse>
           </Grid.Col>
 
           <Grid.Col xs={12}>
