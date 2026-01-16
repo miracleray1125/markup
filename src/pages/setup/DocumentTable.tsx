@@ -13,25 +13,10 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
   const [documents, setDocuments] = useState<WorkspaceDocument[]>([])
   const [documentFiles, setDocumentFiles] = useState<File[]>([])
   const [annotationFiles, setAnnotationFiles] = useState<File[]>([])
-  const [documentToAnnotationCount, setDocumentToAnnotationCount] = useState<Record<string, number>>({})
 
   const uploadAnnotations = useCallback(async (documentId: string, file: File) => {
-    const format = file.name.split(".").pop()
-    const content = await file.text()
-
-    const rawAnnotations = format === "json"
-      ? parseJsonAnnotations(content)
-      : parseStandoffAnnotations(content)
-
     database
-      .addWorkspaceAnnotations(workspace.id, documentId, rawAnnotations)
-      .then(() => {
-        notify.success(`${rawAnnotations.length} annotations uploaded.`)
-
-        const copy = { ...documentToAnnotationCount }
-        copy[documentId] = rawAnnotations.length + (copy[documentId] || 0)
-        setDocumentToAnnotationCount(copy)
-      })
+      .addWorkspaceAnnotations(workspace.id, documentId, file)
       .catch((e) => notify.error("Failed to upload annotations.", e))
   }, [workspace.id])
 
@@ -59,14 +44,20 @@ function DocumentTable({ workspace, workspaceStatus, setWorkspaceStatus }: Secti
     func()
   }, [documents, documentFiles, workspace.id])
 
-  const uploadAnnotations = async (documentId: string, file: File) => {
-    const content = await file.text()
-    const annotations = JSON.parse(content) as RawAnnotation[]
+  useEffect(() => {
+    annotationFiles.forEach(annotationFile => {
+      const document = documents.find(document => {
+        const documentFileName = document.name.split(".").slice(0, -1).join(".")
+        const annotationFileName = annotationFile.name.split(".").slice(0, -1).join(".")
 
-    database
-      .addWorkspaceAnnotations(documentId, annotations)
-      .catch(() => console.error("Failed to upload annotations. Please try again later."))
-  }
+        return documentFileName === annotationFileName
+      })
+
+      if (document) {
+        uploadAnnotations(document.id, annotationFile)
+      }
+    })
+  }, [annotationFiles, documents, uploadAnnotations, workspace.id])
 
   useEffect(() => {
     if (setWorkspaceStatus === undefined) return
